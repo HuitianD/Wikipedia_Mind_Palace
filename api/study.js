@@ -1,5 +1,6 @@
 // Vercel serverless function: POST /api/study
-// Body: { action, ... }. Actions: status, signin, resume, start, sync, end (participants)
+// Body: { action, ... }. Actions: status, signin, resume, start, sync, end,
+// quiz_start, quiz_save, quiz_submit (participants)
 // and admin_list, admin_delete (research team, with the STUDY_ADMIN_KEY).
 // Set MONGODB_URI and STUDY_ADMIN_KEY in the Vercel project's environment variables.
 import { handleStudy, HttpError } from '../lib/study-api.js';

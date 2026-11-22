@@ -1,6 +1,9 @@
 {
   "readingMinutes": 15,
+  "quizMinutes": 10,
+  "retakeAfterHours": 48,
   "afterReadingUrl": "",
+  "afterRetakeUrl": "",
   "articles": [
     {
       "id": "chasse-galerie",

@@ -1,10 +1,11 @@
 // Study mode (open index.html?study). Implements the procedure in "User Study Design":
-//   researcher setup → participant sign-in → interface walkthrough → timed reading (15 min) → closed screen
+//   researcher setup → participant sign-in → interface walkthrough → timed reading (15 min)
+//   → memory quiz (10 min) → closed screen → two days later: the same quiz again (10 min)
 // for two conditions that show exactly the same article text:
 //   palace  – the Wikipedia Mind Palace (participant picks an object for each stop)
 //   article – a plain Wikipedia-style page where the participant can highlight text
-// Everything the participant does is logged with timestamps. The quizzes and
-// questionnaires stay outside the app.
+// Everything the participant does is logged with timestamps. The familiarity rating,
+// and the follow-up questions stay outside the app.
 //
 // Where a session is kept:
 //   online – when the server has a database (api/study, MongoDB). The participant opens
@@ -95,6 +96,7 @@ async function syncNow() {
 
 // last chance to save when the tab is closed or hidden
 window.addEventListener('pagehide', () => {
+  flushQuiz();
   const s = study.session;
   if (!online || !dirty || !s?.startedAt || s.endedAt) return;
   navigator.sendBeacon('api/study', new Blob([JSON.stringify({ action: 'sync', token, ...progress() })], { type: 'application/json' }));
@@ -180,7 +182,7 @@ export async function bootStudy(h, mode = '') {
   if (saved && !saved.endedAt) return resume(saved);
   // A reload after the session closed must not hand the participant the setup screen.
   const ended = (store.get(LOGS_KEY) || []).find((r) => r.id === store.get(ENDED_KEY));
-  if (ended) return showEnd(ended);
+  if (ended) return afterReading(ended);
   showSetup();
 }
 
@@ -223,7 +225,7 @@ async function enterOnline(r, person = null, returning = false) {
   const { choices, ...rest } = sv;
   study.session = { ...rest, person, palace: null, source: palaceData };
   const s = study.session;
-  if (s.endedAt) return showEnd(s, { saved: true, returning });
+  if (s.endedAt) return afterReading(s, { saved: true, returning });
   if (!s.startedAt) return showWalkthrough(0);
   if (elapsed() >= s.readingMinutes * 60000) return endSession('timeout');
   log('resume_after_reload');
@@ -260,7 +262,7 @@ function showSetup() {
       <span>${logs.length} saved session log${logs.length === 1 ? '' : 's'} in this browser</span>
       ${logs.length ? '<button type="button" id="dl-all">Download all</button><button type="button" id="clear-logs">Clear</button>' : ''}
     </div>
-    <p class="fine"><b>Sessions started here are saved in this browser only.</b> Hand the computer to the participant after pressing Continue: they sign in, see a short introduction, and the timer starts when they press Start reading. The familiarity questions, quizzes and follow-up questions are run outside this app.</p>
+    <p class="fine"><b>Sessions started here are saved in this browser only.</b> Hand the computer to the participant after pressing Continue: they sign in, see a short introduction, and the timer starts when they press Start reading. After reading they take the memory quiz here. The familiarity questions, the follow-up questions and the retake two days later are run outside this app in this mode.</p>
     <p class="fine"><a href="${esc(location.pathname)}?study=admin">Researcher page</a> (sessions saved to the database)</p>`,
   'setup-overlay');
 
@@ -530,51 +532,283 @@ function endSession(reason) {
   $('#reader').hidden = true;
   $('#reader').innerHTML = '';
   if (s.condition === 'palace') hooks.lockPalace();
-  showEnd(record);
-  if (online) sendEnd(reason, 0);
+  if (online) endSaved = sendEnd(reason);
+  afterReading(record);
 }
 
-/** Online: hand the finished session to the server, and keep trying if the connection drops. */
-async function sendEnd(reason, attempt) {
-  const state = () => $('#save-state');
-  try {
-    await api('end', { token, reason, ...progress() });
-    if (state()) state().textContent = 'Your session has been saved. You can close this page.';
-  } catch (err) {
-    if (err.status === 401 || err.status === 400 || attempt >= 40) {
-      if (state()) state().textContent = 'Your session could not be saved. Please tell the research team.';
-      return;
+const sleep = (ms) => new Promise((r) => { setTimeout(r, ms); });
+let endSaved = Promise.resolve(true); // online: whether the server has the finished reading session
+
+/** Online: hand the finished reading to the server, and keep trying if the connection drops. */
+async function sendEnd(reason) {
+  const say = (text) => { if ($('#save-state')) $('#save-state').textContent = text; };
+  for (let attempt = 0; attempt <= 40; attempt++) {
+    try {
+      await api('end', { token, reason, ...progress() });
+      say('');
+      return true;
+    } catch (err) {
+      if (err.status === 401 || err.status === 400) break;
+      say('Saving your reading session… Please keep this page open.');
+      await sleep(3000);
     }
-    if (state()) state().textContent = 'Saving your session… Please keep this page open.';
-    setTimeout(() => sendEnd(reason, attempt + 1), 3000);
+  }
+  say('Your session could not be saved. Please tell the research team.');
+  return false;
+}
+
+// ---- memory quiz: after the reading has closed, and once more two days later -------------
+// The same questions for both conditions, in two rounds:
+//   quiz   – right after the reading, before the closed screen
+//   retake – the same questions again once config.retakeAfterHours have passed (online only).
+//            The participant opens the link again and signs in with the same email address;
+//            the article stays closed.
+// Online, the server hands the questions out only when a round may start, keeps the clock
+// and stores the answers as they are typed. A session kept in this browser gets the
+// questions from the local server and has no retake.
+
+const QUIZ_UNAVAILABLE = [0, 403, 404, 405, 501, 503];
+const ROUND = {
+  quiz: { name: 'Memory quiz', title: 'What do you remember?' },
+  retake: { name: 'Follow-up quiz', title: 'What do you still remember?' },
+};
+let quizState = null; // { record, round, answers, dirty } while a quiz is on screen
+let quizTick = null;
+let quizSaveTimer = null;
+
+/** Write a finished local session back into this browser's logs. */
+function saveLocalRecord(record) {
+  const logs = store.get(LOGS_KEY) || [];
+  const i = logs.findIndex((r) => r.id === record.id);
+  if (i >= 0) logs[i] = record; else logs.push(record);
+  store.set(LOGS_KEY, logs);
+}
+
+/** Online: take over what the server says about both rounds. */
+const takeRounds = (record, sv) => Object.assign(record, { quiz: sv.quiz, retake: sv.retake, retakeOpensAt: sv.retakeOpensAt });
+
+const quizBackend = {
+  /** Start (or continue) a round; returns its questions. */
+  async start(record, round) {
+    if (online) {
+      const r = await api('quiz_start', { token, round });
+      takeRounds(record, r.session);
+      return r.questions;
+    }
+    const r = await api('quiz_questions');
+    record.quiz ||= { startedAt: Date.now(), startedAtIso: new Date().toISOString(), minutes: r.minutes, submittedAt: null, endReason: null, answers: {} };
+    record.quiz.questions = r.questions;
+    saveLocalRecord(record);
+    return r.questions;
+  },
+  async save(record, round, answers) {
+    if (online) return api('quiz_save', { token, round, answers });
+    record[round].answers = answers;
+    return saveLocalRecord(record);
+  },
+  async submit(record, round, answers, reason) {
+    if (online) return takeRounds(record, (await api('quiz_submit', { token, round, answers, reason })).session);
+    Object.assign(record[round], { answers, endReason: reason, submittedAt: new Date().toISOString() });
+    return saveLocalRecord(record);
+  },
+};
+
+/** Where a participant goes once the reading is closed: whichever quiz round is due, else the closed screen. */
+function afterReading(record, opts = {}) {
+  if (record.quizSkipped) return showEnd(record, opts);
+  if (!record.quiz?.submittedAt) return record.quiz?.startedAt ? openQuiz(record, opts, 'quiz') : showQuizIntro(record, opts, 'quiz');
+  if (!online || record.retakeOpensAt == null || record.retake?.submittedAt) return showEnd(record, opts);
+  if (record.retake?.startedAt) return openQuiz(record, opts, 'retake'); // reloaded in the middle of it
+  if (now() >= record.retakeOpensAt) return showQuizIntro(record, opts, 'retake');
+  showEnd(record, opts); // the retake is not open yet
+}
+
+function showQuizIntro(record, opts = {}, round = 'quiz', problem = '') {
+  const what = record.condition === 'palace' ? 'room' : 'article';
+  const closed = record.endReason === 'timeout' ? `Your reading time is over and the ${what} is now closed.` : `Your reading session is closed, and so is the ${what}.`;
+  const mins = Number(config.quizMinutes) > 0 ? Number(config.quizMinutes) : 0;
+  const first = record.person?.name ? `, ${esc(record.person.name.split(/\s+/)[0])}` : '';
+  const top = round === 'retake' ? `
+    <div class="eyebrow">Follow-up quiz</div>
+    <h2>Welcome back${first}</h2>
+    <p class="lead">A couple of days ago you read an article here. Please answer the same questions once more. You will not see the ${what} again.</p>` : `
+    <div class="eyebrow">${record.endReason === 'timeout' ? 'Time is up' : 'Reading finished'}</div>
+    <h2>Next: a short memory quiz</h2>
+    <p class="lead">${closed} Now please answer a few questions about what you read.</p>`;
+  showOverlay(`${top}
+    <ul class="quiz-rules">
+      <li>Answer from memory. Please do not look anything up or ask anyone.</li>
+      <li>${mins ? `You have up to ${minutes(mins)}. The timer starts when you press the button.` : 'There is no time limit.'}</li>
+      <li>If you do not remember something, leave that answer empty.</li>
+    </ul>
+    ${problem ? `<p class="error" role="alert">${esc(problem)}</p>` : ''}
+    <div class="actions"><button type="button" class="primary" id="quiz-start">Start the quiz</button></div>
+    <p class="fine" id="save-state"></p>`, 'end-overlay');
+  $('#quiz-start').onclick = (e) => {
+    e.target.disabled = true;
+    e.target.textContent = 'Loading…';
+    openQuiz(record, opts, round);
+  };
+}
+
+async function openQuiz(record, opts = {}, round = 'quiz') {
+  let questions;
+  try {
+    if (online && !(await endSaved)) throw Object.assign(new Error('Your reading session could not be saved, so the quiz cannot start. Please tell the research team.'), { status: 409 });
+    questions = await quizBackend.start(record, round);
+  } catch (err) {
+    if (!online && QUIZ_UNAVAILABLE.includes(err.status)) {
+      // a session kept in this browser, on a server that cannot hand out the questions
+      record.quizSkipped = 'not available on this server';
+      saveLocalRecord(record);
+      return showEnd(record, opts);
+    }
+    return showQuizIntro(record, opts, round, err.message);
+  }
+  const quiz = record[round];
+  if (quiz.submittedAt) return afterReading(record, { saved: true });
+  const limit = quiz.minutes > 0 ? quiz.minutes * 60000 : 0;
+  const left = () => limit - (now() - quiz.startedAt);
+  if (limit && left() <= 0) return submitQuiz(record, round, quiz.answers || {}, 'timeout'); // time ran out while the page was closed
+
+  showOverlay(`
+    <div class="quiz-head">
+      <div class="eyebrow">${ROUND[round].name}</div>
+      ${limit ? '<span class="study-timer" id="quiz-timer"></span>' : ''}
+    </div>
+    <h2>${ROUND[round].title}</h2>
+    <p class="lead">Answer from memory, in a few words or a sentence. Leave an answer empty if you do not remember.</p>
+    <form id="quiz-form" class="quiz" autocomplete="off">
+      <ol>${questions.map((q) => `
+        <li><label for="quiz-${esc(q.id)}">${esc(q.text)}</label>
+          <textarea id="quiz-${esc(q.id)}" name="${esc(q.id)}" rows="2" maxlength="2000" spellcheck="false">${esc(quiz.answers?.[q.id] || '')}</textarea></li>`).join('')}
+      </ol>
+      <div class="actions"><button class="primary" type="submit">Submit my answers</button></div>
+    </form>
+    <p class="fine" id="quiz-state">Your answers are saved as you type.</p>`, 'end-overlay quiz-overlay');
+  overlay().scrollTop = 0;
+
+  const form = $('#quiz-form');
+  const answers = () => Object.fromEntries(questions.map((q) => [q.id, form.elements[q.id].value]));
+  quizState = { record, round, answers, dirty: false };
+  form.addEventListener('input', () => {
+    quizState.dirty = true;
+    clearTimeout(quizSaveTimer);
+    quizSaveTimer = setTimeout(saveQuizDraft, 2000);
+  });
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const empty = questions.filter((q) => !form.elements[q.id].value.trim()).length;
+    if (empty && !window.confirm(`You left ${empty} answer${empty === 1 ? '' : 's'} empty. Submit anyway?`)) return;
+    submitQuiz(record, round, answers(), 'submitted');
+  });
+  if (limit) {
+    const update = () => {
+      const ms = left();
+      const el = $('#quiz-timer');
+      if (el) { el.textContent = `⏱ ${fmt(ms)}`; el.classList.toggle('warn', ms <= 60000); }
+      if (ms <= 0) submitQuiz(record, round, answers(), 'timeout');
+    };
+    clearInterval(quizTick);
+    quizTick = setInterval(update, 500);
+    update();
+  }
+  form.querySelector('textarea')?.focus({ preventScroll: true });
+}
+
+async function saveQuizDraft() {
+  const q = quizState;
+  if (!q?.dirty) return;
+  q.dirty = false;
+  try {
+    const r = await quizBackend.save(q.record, q.round, q.answers());
+    if (r?.ended || r?.expired) submitQuiz(q.record, q.round, q.answers(), 'timeout');
+  } catch {
+    if (quizState === q) { q.dirty = true; quizSaveTimer = setTimeout(saveQuizDraft, 5000); }
   }
 }
+
+/** Last chance to keep quiz answers when the tab is closed or hidden. */
+function flushQuiz() {
+  const q = quizState;
+  if (!q?.dirty) return;
+  if (online) navigator.sendBeacon('api/study', new Blob([JSON.stringify({ action: 'quiz_save', token, round: q.round, answers: q.answers() })], { type: 'application/json' }));
+  else quizBackend.save(q.record, q.round, q.answers());
+  q.dirty = false;
+}
+
+async function submitQuiz(record, round, answers, reason) {
+  if (quizState?.submitting) return;
+  quizState = { record, round, answers: () => answers, dirty: false, submitting: true };
+  clearInterval(quizTick);
+  clearTimeout(quizSaveTimer);
+  showOverlay(`
+    <div class="eyebrow">${ROUND[round].name}</div>
+    <h2>${reason === 'timeout' ? 'Time is up' : 'Saving your answers…'}</h2>
+    <p class="lead" id="quiz-saving">Saving your answers… Please keep this page open.</p>`, 'end-overlay');
+  for (let attempt = 0; attempt <= 40; attempt++) {
+    try {
+      await quizBackend.submit(record, round, answers, reason);
+      quizState = null;
+      return afterReading(record, { saved: true });
+    } catch (err) {
+      if (err.status === 401 || err.status === 400 || err.status === 409) break;
+      await sleep(3000);
+    }
+  }
+  if ($('#quiz-saving')) $('#quiz-saving').textContent = 'Your answers could not be saved. Please keep this page open and tell the research team.';
+}
+
+const httpsLink = (url, label) => (/^https:\/\//.test(url || '') ? `<div class="actions"><a class="button primary" href="${esc(url)}">${label}</a></div>` : '');
+const longDate = (ms) => new Date(ms).toLocaleString('en-US', { weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
 /**
  * The closed screen. It stays up, even after a reload, until a new session is started:
- * by the researcher (local), or never for the same email address (online).
+ * by the researcher (local), or never for the same email address (online). Online, it
+ * also says when the follow-up quiz opens, and the same link then leads to that quiz.
  */
 function showEnd(record, { saved = false, returning = false } = {}) {
   const what = record.condition === 'palace' ? 'room' : 'article';
-  const closed = record.endReason === 'timeout' ? `Your reading time is over and the ${what} is now closed.` : 'Your reading session is closed.';
-  const head = `
-    <div class="eyebrow">${record.endReason === 'timeout' ? 'Time is up' : 'Reading finished'}</div>
-    <h2>Thank you${record.person?.name ? `, ${esc(record.person.name.split(/\s+/)[0])}` : ''}!</h2>`;
-  if (online) {
-    const next = /^https:\/\//.test(config.afterReadingUrl || '')
-      ? `<div class="actions"><a class="button primary" href="${esc(config.afterReadingUrl)}">Continue to the questions</a></div>`
-      : '';
-    showOverlay(`${head}
-      <p class="lead">${returning ? 'You have already completed this session, so it cannot be opened again.' : closed} ${next ? 'Please continue with the questions.' : 'Please continue with the next step the research team gave you.'}</p>
-      ${next}
-      <p class="fine" id="save-state">${saved ? 'Your session has been saved. You can close this page.' : 'Saving your session… Please keep this page open.'}</p>`, 'end-overlay');
+  const quizDone = !!record.quiz?.submittedAt;
+  const first = record.person?.name ? `, ${esc(record.person.name.split(/\s+/)[0])}` : '';
+  const savedLine = `<p class="fine" id="save-state">${saved ? 'Your session has been saved. You can close this page.' : 'Saving your session… Please keep this page open.'}</p>`;
+  if (online && record.retake?.submittedAt) {
+    // both rounds are in
+    const next = httpsLink(config.afterRetakeUrl, 'Continue to the last question');
+    showOverlay(`
+      <div class="eyebrow">Study complete</div>
+      <h2>Thank you${first}!</h2>
+      <p class="lead">${returning ? 'You have already finished both parts of the study.' : `${record.retake.endReason === 'timeout' ? 'The quiz time is over and your answers are in.' : 'Your answers are in.'} You have finished both parts of the study.`} ${next ? 'One last question, please.' : 'We appreciate your time.'}</p>
+      ${next}${savedLine}`, 'end-overlay');
     return;
   }
+  const closed = quizDone
+    ? (record.quiz.endReason === 'timeout' ? 'The quiz time is over and your answers are in.' : 'Your answers are in.')
+    : record.endReason === 'timeout' ? `Your reading time is over and the ${what} is now closed.` : 'Your reading session is closed.';
+  const head = `
+    <div class="eyebrow">${quizDone ? 'Session complete' : record.endReason === 'timeout' ? 'Time is up' : 'Reading finished'}</div>
+    <h2>Thank you${first}!</h2>`;
+  if (online) {
+    const next = httpsLink(config.afterReadingUrl, 'Continue to the questions');
+    const mins = Number(config.quizMinutes) > 0 ? ` It takes up to ${minutes(Number(config.quizMinutes))}.` : '';
+    const comeBack = record.retakeOpensAt != null
+      ? `<p class="lead come-back"><b>One more step in two days:</b> a short follow-up quiz opens on <b>${esc(longDate(record.retakeOpensAt))}</b>. Please come back to this same link then, and sign in with the same email address if you are asked.${mins}</p>`
+      : '';
+    const today = comeBack ? 'That is everything for today.' : 'That is everything for today. The research team will contact you about the follow-up quiz in two days.';
+    showOverlay(`${head}
+      <p class="lead">${returning ? (comeBack ? 'You have finished the first part. The follow-up quiz is not open yet.' : 'You have already completed this session, so it cannot be opened again.') : `${closed} ${next ? 'Please continue with the questions.' : today}`}</p>
+      ${next}${comeBack}${savedLine}`, 'end-overlay');
+    return;
+  }
+  const answered = quizDone ? Object.values(record.quiz.answers || {}).filter((a) => a.trim()).length : 0;
+  const quizLine = quizDone
+    ? ` · quiz: ${answered} of ${record.quiz.questions?.length ?? '?'} answered${record.quiz.endReason === 'timeout' ? ' (time ran out)' : ''}`
+    : record.quizSkipped ? ` · no quiz (${esc(record.quizSkipped)}): give it on paper or a form` : '';
   showOverlay(`${head}
     <p class="lead">${closed} Please let the researcher know you are done.</p>
     <details class="researcher">
       <summary>Researcher</summary>
-      <p>Session <b>${esc(record.participant)}</b> · ${record.condition === 'palace' ? 'Mind Palace' : 'Standard article'} · ${fmt(record.endedAtMs)} read · ${esc(record.endReason)}</p>
+      <p>Session <b>${esc(record.participant)}</b> · ${record.condition === 'palace' ? 'Mind Palace' : 'Standard article'} · ${fmt(record.endedAtMs)} read · ${esc(record.endReason)}${quizLine}</p>
       <div class="actions">
         <button type="button" class="primary" id="dl-session">Download this log</button>
         <button type="button" id="new-session">New session</button>
@@ -622,13 +856,50 @@ function statusOf(sv, at) {
   return { label: 'Time ran out (page was closed)', ms: limit };
 }
 
+const shortDate = (ms) => new Date(ms).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+/** Where a participant is with one round of the quiz ('quiz' or 'retake'), for the researcher page. */
+function quizStatusOf(sv, at, round = 'quiz') {
+  const q = sv[round];
+  if (!q && round === 'retake') {
+    if (sv.retakeOpensAt == null) return { label: '–', answered: null, ms: null };
+    return { label: at < sv.retakeOpensAt ? `Opens ${shortDate(sv.retakeOpensAt)}` : 'Open, not started', answered: null, ms: null };
+  }
+  if (!q) return { label: sv.endedAt ? 'Not started' : '–', answered: null, ms: null };
+  const answered = Object.values(q.answers || {}).filter((a) => a.trim()).length;
+  const limit = q.minutes > 0 ? q.minutes * 60000 : Infinity;
+  if (q.submittedAt) return { label: q.endReason === 'timeout' ? 'Time ran out' : 'Submitted', answered, ms: new Date(q.submittedAt) - q.startedAt, done: true };
+  if (at - q.startedAt < limit) return { label: 'Answering now', answered, ms: at - q.startedAt };
+  return { label: 'Time ran out (page was closed)', answered, ms: limit, done: true };
+}
+
 const palaceFiles = {};
 const palaceFile = (path) => (palaceFiles[path] ??= fetch(path, { cache: 'no-cache' }).then((r) => r.json()).catch(() => null));
 
 /** A server session plus its status and the same summary a local log gets. */
-async function toRecord(sv, at) {
+async function toRecord(sv, at, quiz = []) {
   const st = statusOf(sv, at);
-  const record = { ...sv, status: st.label };
+  const qs = quizStatusOf(sv, at);
+  const rs = quizStatusOf(sv, at, 'retake');
+  const record = { ...sv, status: st.label, quizStatus: qs.label, retakeStatus: rs.label };
+  if (sv.retake) {
+    record.retake = {
+      ...sv.retake,
+      seconds: rs.ms == null ? null : Math.round(rs.ms / 1000),
+      // how long after the first quiz was handed in the retake began
+      hoursAfterQuiz: sv.quiz?.submittedAt ? Math.round((sv.retake.startedAt - new Date(sv.quiz.submittedAt)) / 360000) / 10 : null,
+      responses: quiz.map((q) => ({ id: q.id, question: q.text, expected: q.answer, answer: sv.retake.answers?.[q.id] ?? '' })),
+    };
+  }
+  if (sv.quiz) {
+    record.quiz = {
+      ...sv.quiz,
+      seconds: qs.ms == null ? null : Math.round(qs.ms / 1000),
+      // how long after the reading closed the quiz began
+      secondsAfterReading: sv.endedAt ? Math.max(0, Math.round((sv.quiz.startedAt - new Date(sv.endedAt)) / 1000)) : null,
+      responses: quiz.map((q) => ({ id: q.id, question: q.text, expected: q.answer, answer: sv.quiz.answers?.[q.id] ?? '' })),
+    };
+  }
   if (sv.startedAt && !st.live) {
     const p = await palaceFile(sv.article.file);
     record.summary = summarize({
@@ -638,13 +909,15 @@ async function toRecord(sv, at) {
       palace: p ? { chunks: p.chunks.map((c, i) => ({ heading: c.heading, objectId: sv.choices[i] ?? null })) } : null,
     });
   }
-  return { record, st };
+  return { record, st, qs, rs };
 }
 
-function toCsv(records) {
+function toCsv(records, quiz = []) {
   const stops = Math.max(0, ...records.map((r) => r.stops || 0));
   const head = ['participant', 'name', 'email', 'age', 'condition', 'status', 'signed_in', 'started', 'reading_seconds',
-    'objects_placed', 'object_changes', 'highlights', ...Array.from({ length: stops }, (_, i) => `seconds_stop_${i + 1}`)];
+    'objects_placed', 'object_changes', 'highlights', ...Array.from({ length: stops }, (_, i) => `seconds_stop_${i + 1}`),
+    'quiz_status', 'quiz_started', 'quiz_seconds', 'quiz_seconds_after_reading', ...quiz.map((q) => q.id),
+    'retake_status', 'retake_started', 'retake_seconds', 'retake_hours_after_quiz', ...quiz.map((q) => `retake_${q.id}`)];
   const cell = (v) => {
     let t = v == null ? '' : String(v);
     if (/^[=+\-@\t\r]/.test(t)) t = `'${t}`; // a name must never run as a spreadsheet formula
@@ -654,6 +927,8 @@ function toCsv(records) {
     r.participant, r.person.name, r.person.email, r.person.age, r.condition, r.status, r.person.signedInAt, r.startedAtIso,
     r.summary ? Math.round(r.summary.readingMs / 1000) : '', r.summary?.objectsPlaced, r.summary?.objectChanges, r.summary?.highlightCount,
     ...Array.from({ length: stops }, (_, i) => r.summary?.secondsPerStop?.[i + 1]),
+    r.quizStatus, r.quiz?.startedAtIso, r.quiz?.seconds, r.quiz?.secondsAfterReading, ...quiz.map((q) => r.quiz?.answers?.[q.id]),
+    r.retakeStatus, r.retake?.startedAtIso, r.retake?.seconds, r.retake?.hoursAfterQuiz, ...quiz.map((q) => r.retake?.answers?.[q.id]),
   ]);
   return [head, ...rows].map((row) => row.map(cell).join(',')).join('\n');
 }
@@ -668,10 +943,13 @@ async function showAdmin() {
     try { sessionStorage.removeItem(ADMIN_KEY); } catch { /* ignore */ }
     return showAdminKey(err.message);
   }
-  const rows = await Promise.all(data.sessions.map((sv) => toRecord(sv, data.now)));
+  const quiz = Array.isArray(data.quiz) ? data.quiz : [];
+  const rows = await Promise.all(data.sessions.map((sv) => toRecord(sv, data.now, quiz)));
   const records = rows.map((r) => r.record);
   const count = (c) => records.filter((r) => r.condition === c).length;
   const done = rows.filter((r) => r.st.ms != null && !r.st.live).length;
+  const quizDone = rows.filter((r) => r.qs.done).length;
+  const retakeDone = rows.filter((r) => r.rs.done).length;
   const link = `${location.origin}${location.pathname}?study`;
   const day = new Date().toISOString().slice(0, 10);
   const when = (iso) => (iso ? new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '–');
@@ -679,7 +957,7 @@ async function showAdmin() {
   showOverlay(`
     <div class="eyebrow">Research team</div>
     <h2>Study data</h2>
-    <p class="lead">${records.length} participant${records.length === 1 ? '' : 's'} · ${count('palace')} Mind Palace · ${count('article')} standard article · ${done} finished reading</p>
+    <p class="lead">${records.length} participant${records.length === 1 ? '' : 's'} · ${count('palace')} Mind Palace · ${count('article')} standard article · ${done} finished reading · ${quizDone} finished the quiz · ${retakeDone} finished the retake</p>
     <label class="share">Link for participants
       <span><input id="share-link" readonly value="${esc(link)}"><button type="button" id="copy-link">Copy</button></span>
     </label>
@@ -691,8 +969,8 @@ async function showAdmin() {
       <button type="button" id="admin-lock">Lock</button>
     </div>
     <div class="admin-table-wrap"><table class="admin-table">
-      <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Age</th><th>Condition</th><th>Status</th><th>Signed in</th><th>Read</th><th>Result</th><th></th></tr></thead>
-      <tbody>${rows.map(({ record: r, st }, i) => `<tr>
+      <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Age</th><th>Condition</th><th>Status</th><th>Signed in</th><th>Read</th><th>Result</th><th>Quiz</th><th>Retake</th><th></th></tr></thead>
+      <tbody>${rows.map(({ record: r, st, qs, rs }, i) => `<tr>
         <td><b>${esc(r.participant)}</b></td>
         <td>${esc(r.person.name)}</td>
         <td>${esc(r.person.email)}</td>
@@ -702,9 +980,16 @@ async function showAdmin() {
         <td>${esc(when(r.person.signedInAt))}</td>
         <td>${st.ms == null ? '–' : fmt(st.ms)}</td>
         <td>${!r.summary ? '–' : r.condition === 'palace' ? `${r.summary.objectsPlaced ?? 0}/${r.stops} objects` : `${r.summary.highlightCount} highlight${r.summary.highlightCount === 1 ? '' : 's'}`}</td>
+        <td>${esc(qs.label)}${qs.answered == null ? '' : `<br><small>${qs.answered}/${quiz.length} answered · ${fmt(qs.ms)}</small>`}</td>
+        <td>${esc(rs.label)}${rs.answered == null ? '' : `<br><small>${rs.answered}/${quiz.length} answered · ${fmt(rs.ms)}${r.retake?.hoursAfterQuiz == null ? '' : ` · ${r.retake.hoursAfterQuiz} h later`}</small>`}</td>
         <td><button type="button" data-dl="${i}">JSON</button> <button type="button" data-del="${i}">Delete</button></td>
-      </tr>`).join('') || '<tr><td colspan="10">No one has signed in yet.</td></tr>'}</tbody>
+      </tr>`).join('') || '<tr><td colspan="12">No one has signed in yet.</td></tr>'}</tbody>
     </table></div>
+    <details class="researcher answer-key">
+      <summary>Quiz questions and expected answers</summary>
+      <ol>${quiz.map((q) => `<li>${esc(q.text)}<br><b>${esc(q.answer)}</b></li>`).join('')}</ol>
+      <p>Each participant's answers are in the downloads: one column per question in the CSV, and next to the expected answer in the JSON.</p>
+    </details>
     <p class="fine">These records hold names, email addresses and ages. Keep downloaded files within the research team and out of the repository. Deleting a session lets that email address take part again; use it for your own test runs.</p>
     <p class="fine"><a href="${esc(location.pathname)}?study=local">Run a session in this browser only</a> (not saved to the database)</p>`, 'admin-overlay');
 
@@ -714,7 +999,7 @@ async function showAdmin() {
   };
   $('#admin-refresh').onclick = showAdmin;
   $('#admin-json').onclick = () => download(`mind-palace-study-${day}.json`, records);
-  $('#admin-csv').onclick = () => downloadText(`mind-palace-study-${day}.csv`, toCsv(records), 'text/csv');
+  $('#admin-csv').onclick = () => downloadText(`mind-palace-study-${day}.csv`, toCsv(records, quiz), 'text/csv');
   $('#admin-lock').onclick = () => {
     try { sessionStorage.removeItem(ADMIN_KEY); } catch { /* ignore */ }
     showAdminKey();

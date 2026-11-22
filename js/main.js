@@ -4,6 +4,7 @@ import { THEMES, pickTheme, suggestObjects, explain } from './mapper.js';
 import { OBJECTS, OBJECT_BY_ID } from './catalog.js';
 import { study, bootStudy, log as studyLog, saveStudy, finishEarly } from './study.js';
 import { findAnchors } from './anchors.js';
+import { access, loadAccess, needsSignIn, domainText, sessionExpired, setRemaining } from './access.js';
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -200,13 +201,25 @@ async function requestClaude(title, chunks) {
     body: JSON.stringify({
       title,
       chunks: chunks.map((c) => ({ heading: c.heading, text: c.parts.map((p) => `${p.heading}\n${p.full}`).join('\n\n') })),
+      token: access.token || undefined, // the sign-in session, where the site asks for one (js/access.js)
     }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
-    throw new Error(body?.error || (res.status === 404 || res.status === 501 ? 'no AI server running' : `server returned ${res.status}`));
+    if (body?.code === 'signin') sessionExpired();
+    const message = body?.error || (res.status === 404 || res.status === 501 ? 'no AI server running' : `server returned ${res.status}`);
+    throw Object.assign(new Error(message), { code: body?.code });
   }
-  return res.json();
+  const out = await res.json();
+  setRemaining(out.remaining);
+  return out;
+}
+
+/** Why Claude was not used, as a short message for the reader. */
+function fallbackNotice(err) {
+  if (err.code === 'signin') return `Not signed in, so the objects are matched by keywords. For Claude's suggestions, sign in with a ${domainText() || 'Brown'} account on the start page.`;
+  if (err.code === 'limit') return `${err.message} Using keyword suggestions instead.`;
+  return `Claude suggestions unavailable (${err.message.replace(/\.$/, '')}). Using keyword suggestions instead.`;
 }
 
 function keywordSuggestions(chunks) {
@@ -217,6 +230,10 @@ function keywordSuggestions(chunks) {
     return s.map((m) => ({ id: m.id, why: `matches: ${explain(m)}` }));
   });
 }
+
+// Whether Claude needs a sign-in on this site. Only asked in Explore mode: the study
+// never uses Claude, so its pages never contact the sign-in provider.
+let accessReady = Promise.resolve();
 
 // ---- ready-made palaces ---------------------------------------------------------------
 // Articles listed in data/palaces/index.json were built ahead of time
@@ -258,12 +275,15 @@ async function buildFromArticle(getArticle) {
     const chunks = chunkArticle(article.extract);
     if (!chunks.length) throw new Error('That article has no readable sections.');
 
-    setLoading('Asking Claude to pick a theme and objects…');
+    await accessReady;
+    const askClaude = !needsSignIn();
+    setLoading(askClaude ? 'Asking Claude to pick a theme and objects…' : 'Matching objects to each section…');
     let theme;
     let themeReason = null;
     let perChunk;
     let suggestedBy;
     try {
+      if (!askClaude) throw Object.assign(new Error('not signed in'), { code: 'signin' });
       const ai = await requestClaude(article.title, chunks);
       theme = ai.theme;
       themeReason = ai.themeReason;
@@ -273,7 +293,7 @@ async function buildFromArticle(getArticle) {
       theme = pickTheme(chunks);
       perChunk = keywordSuggestions(chunks);
       suggestedBy = { source: 'keywords', at: new Date().toISOString(), note: err.message };
-      toast(`Claude suggestions unavailable (${err.message.replace(/\.$/, "")}). Using keyword suggestions instead.`);
+      toast(fallbackNotice(err), 8000);
     }
 
     loadPalace({
@@ -654,7 +674,7 @@ function showWalk() {
   studyLog('free_walk');
 }
 
-// ---- recall test (not offered in the study: it would be extra retrieval practice) ----------
+// ---- self-recall test (Explore only; the study has its own memory quiz in study.js) ----------
 
 function startRecall() {
   if (inStudy()) return;
@@ -814,6 +834,7 @@ if (params.has('study')) {
     lockPalace: () => { hideCandidates(); closePanel(); setHint(''); $('#topbar').hidden = true; room.mode = 'landing'; },
   }, params.get('study'));
 } else {
+  accessReady = loadAccess($('#access'));
   showLanding();
   if (params.get('article')) {
     $('#q').value = params.get('article');

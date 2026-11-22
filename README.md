@@ -14,7 +14,8 @@ npm run dev            # http://localhost:8000
 ```
 
 To turn on Claude suggestions, copy `.env.example` to `.env` and set `ANTHROPIC_API_KEY`. Without a key
-everything still works: the app shows a notice and falls back to the offline keyword matcher. three.js
+everything still works: the app shows a notice and falls back to the offline keyword matcher. On a
+public site, Claude is limited to people who sign in with a Brown account (see "Who can use Claude"). three.js
 loads from jsDelivr, so the browser needs internet access.
 
 The app has two modes, switched at the top of the landing page:
@@ -99,8 +100,17 @@ This follows the teammate's *User Study Design*. What a participant goes through
 3. **Timed reading:** the countdown (15 min, from `data/study.json`) starts when they press *Start
    reading*, before any object is placed, so building the palace counts as reading time. It shows in the
    top bar and turns red in the last minute.
-4. **Closed:** when time runs out, or they press *I'm done*, the room or article is replaced by a dark
-   screen and stays closed.
+4. **Reading closes:** when time runs out, or they press *I'm done*, the room or article is taken off
+   the page and stays closed.
+5. **Memory quiz:** the 8 questions from the study design, on one page, with their own countdown
+   (10 min, `quizMinutes` in `data/study.json`; 0 = no limit). The timer starts when they press *Start the
+   quiz*. Answers are saved as they type; when the time is up, what is written is handed in.
+6. **Closed:** a thank-you screen that says when the follow-up quiz opens.
+7. **Two days later, the retake:** the participant opens the same link (and signs in with the same email
+   address if the browser no longer remembers them) and gets the same 8 questions again, with the same time
+   limit. The article stays closed: this round measures what is still remembered. It opens
+   `retakeAfterHours` (48) after the first quiz was handed in; before that the link shows the opening time.
+   Needs the database; leave `retakeAfterHours` out of `data/study.json` to run the retake outside the app.
 
 ### With a database (participants on their own computers)
 
@@ -117,8 +127,18 @@ Set `MONGODB_URI` and `STUDY_ADMIN_KEY` (see `.env.example`) and `/?study` becom
 - **`/?study=admin`** (asks for `STUDY_ADMIN_KEY`) lists everyone with their status, and downloads all
   sessions as JSON, the summary table as CSV, or one session. *Delete* removes a session, for example your
   own test runs, and lets that address take part again.
-- **After reading:** set `afterReadingUrl` in `data/study.json` to the quiz form (an `https://` link) and
-  the closed screen shows a *Continue to the questions* button.
+- **The quiz is kept on the server.** The questions (`lib/study-quiz.js`) are only sent once that
+  participant's reading has closed, the quiz clock is the server's, and the expected answers never go to a
+  participant. A reload or another computer continues the quiz with the answers typed so far.
+- **Grading:** the researcher page shows who has finished the quiz and the retake, and lists the expected
+  answers. The CSV has one column per question and round (`q1`…, `retake_q1`…); the JSON puts each answer
+  next to the question and the expected answer. It also records how long each round took, how long after
+  the reading the quiz began, and how many hours after the quiz the retake began.
+- **Forms after each round:** set `afterReadingUrl` in `data/study.json` to a form (an `https://` link),
+  for example the follow-up questions, and the screen after the first quiz shows a *Continue to the
+  questions* button. `afterRetakeUrl` does the same after the retake, for the second-session question.
+- **Nobody is reminded automatically.** The closed screen tells participants when to come back; send them
+  the link again after two days. The researcher page shows whose retake is open and not yet started.
 
 Setup: create a free cluster at MongoDB Atlas, add a database user, allow network access from anywhere
 (Vercel's addresses change), and copy the connection string into `MONGODB_URI`. Data goes to the
@@ -131,9 +151,11 @@ that participant's session, though not their name or age), and the endpoint has 
 ### Without a database (`/?study=local`, or when `MONGODB_URI` is not set)
 
 A researcher sets the session up on their own computer: participant ID, condition (or random), article and
-reading time. The participant then signs in and reads as above. The log stays in that browser; download it
-under *Researcher* on the closed screen, or all of them from the setup screen. The closed screen stays up
-after a reload until the researcher presses *New session*.
+reading time. The participant then signs in, reads and takes the quiz as above. The log, with the quiz
+answers, stays in that browser; download it under *Researcher* on the closed screen, or all of them from the
+setup screen. The closed screen stays up after a reload until the researcher presses *New session*. The quiz
+questions come from the local server (`npm run dev`); on a server that has a database, a `?study=local`
+session ends without the quiz. There is no retake in this mode.
 
 What keeps the two conditions comparable:
 
@@ -143,8 +165,9 @@ What keeps the two conditions comparable:
 - **Same suggestions and setting for everyone.** Claude runs once at build time, not per participant:
   `npm run build-palace -- "Chasse-galerie"` (uses `ANTHROPIC_API_KEY`). The current file holds Claude's
   suggestions and is set to the Grand Library. Don't rebuild it once the study has started.
-- **No extra practice.** The self-recall test is hidden in study mode (it would be extra retrieval
-  practice the control group doesn't get), and there are no outbound links.
+- **Same quiz, no extra practice.** Both conditions get the same memory quiz after the reading. The
+  palace's own self-recall test is hidden in study mode (it would be extra retrieval practice the control
+  group doesn't get), and there are no outbound links.
 - **Control condition:** a plain Wikipedia-style page. Participants highlight by selecting text and click
   a highlight to remove it, as in the proposal.
 
@@ -155,15 +178,45 @@ reload mid-session resumes with the original start time.
 Logs hold the participant's name, email and age (`person`), so treat the database and any downloaded
 files as personal data: keep them out of the repo and share them only within the team.
 
-The familiarity rating, both quizzes and the follow-up questions stay outside the app (e.g. a form).
+The familiarity rating and the follow-up questions stay outside the app (e.g. a form). Don't change the
+questions in `lib/study-quiz.js` once the study has started.
+
+## Who can use Claude (sign-in)
+
+Asking Claude about a new article spends API credit, so on a public site it sits behind a sign-in.
+The ready-made palaces, the keyword suggestions and the study are free and need no sign-in.
+
+- Set `GOOGLE_CLIENT_ID` and the Explore page shows a "Sign in with Google" button. Only accounts in
+  `ALLOWED_EMAIL_DOMAINS` (default `brown.edu`) get Claude's suggestions; the server checks Google's
+  signed token, including the account's Workspace domain, so typing a Brown address is not enough.
+  `ALLOWED_EMAILS` adds single addresses outside the domain (a teammate's Gmail, say).
+- Everyone signed in gets `SUGGEST_DAILY_LIMIT` Claude requests a day (default 10; one request = one
+  article). With `MONGODB_URI` set, the count is kept in the `usage` collection (email, day, count;
+  rows delete themselves after 30 days). Without a database it is counted in memory, which Vercel does
+  not keep between server instances, so set `MONGODB_URI` for a limit that holds.
+- Someone not signed in, or over the limit, still gets a palace for any article: the objects are then
+  matched by keywords, and a notice says so.
+- Without `GOOGLE_CLIENT_ID`, Claude is open to everyone on your own computer (`npm run dev`) and
+  **switched off on Vercel**, so a deployment cannot expose the key by accident.
+
+To get a client ID: Google Cloud console > APIs & Services > Credentials > Create credentials > OAuth
+client ID > Web application. Under "Authorized JavaScript origins" add the site's address
+(`https://<project>.vercel.app`) and, for local testing, `http://localhost:8000` and `http://localhost`.
+No client secret is used. The code is in `lib/access.js`, `api/auth.js` and `js/access.js`.
+
+As a last line of defence, set a monthly spend limit for the API key in the Claude Console.
 
 ## Deploy (Vercel)
 
-The repo deploys as-is: static files plus the `api/suggest.js` and `api/study.js` functions. Set
-`ANTHROPIC_API_KEY`, and for the study `MONGODB_URI` and `STUDY_ADMIN_KEY`, in the Vercel project's
-environment variables. `vercel.json` makes sure the study function can read `data/`.
+The repo deploys as-is: static files plus the `api/suggest.js`, `api/auth.js` and `api/study.js`
+functions. Set these in the Vercel project's environment variables:
 
-The suggest endpoint has no auth, so anyone who finds the URL can spend
-API credit. For the study, use the pre-built palace and consider leaving the key unset in production.
+- for the study: `MONGODB_URI` and `STUDY_ADMIN_KEY`
+- for Claude in Explore mode: `ANTHROPIC_API_KEY` **and** `GOOGLE_CLIENT_ID` (see above). With only the
+  API key, Claude stays off on Vercel.
+
+`vercel.json` makes sure the study function can read `data/`, and redirects requests for `lib/` and
+`scripts/` so the quiz questions cannot be opened as a file. After deploying, check that
+`https://<project>.vercel.app/lib/study-quiz.js` does not show them.
 
 Article text from Wikipedia under CC BY-SA 4.0.

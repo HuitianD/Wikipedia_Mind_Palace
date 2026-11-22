@@ -4,14 +4,17 @@
 // Without it, the site still works and falls back to keyword suggestions.
 // Put MONGODB_URI and STUDY_ADMIN_KEY there to save study sessions to MongoDB.
 // Without them, study sessions are kept in the browser that ran them.
+// Put GOOGLE_CLIENT_ID there to require a Brown sign-in before Claude is used (lib/access.js).
 import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import suggest from './api/suggest.js';
 import study from './api/study.js';
+import auth from './api/auth.js';
+import { accessConfig } from './lib/access.js';
 
-const API = { '/api/suggest': suggest, '/api/study': study };
+const API = { '/api/suggest': suggest, '/api/study': study, '/api/auth': auth };
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 8000;
@@ -45,13 +48,18 @@ http.createServer(async (req, res) => {
   if (!file.startsWith(root) || PRIVATE.test(rel)) { res.writeHead(404).end('Not found'); return; }
   try {
     const data = await fs.readFile(file);
-    res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
+    res.writeHead(200, {
+      'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream',
+      'Cache-Control': 'no-cache',
+      'Referrer-Policy': 'no-referrer-when-downgrade', // Google's sign-in button needs this on http://localhost
+    });
     res.end(data);
   } catch {
     res.writeHead(404).end('Not found');
   }
 }).listen(PORT, () => {
-  const ai = process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN ? 'Claude suggestions on' : 'no API key: keyword suggestions only';
+  const cfg = accessConfig();
+  const ai = { off: 'no API key: keyword suggestions only', open: 'Claude suggestions on for everyone (no GOOGLE_CLIENT_ID)', signin: `Claude suggestions after sign-in (${cfg.domains.join(', ')}; ${cfg.dailyLimit} a day each)` }[cfg.claude];
   const db = process.env.MONGODB_URI ? 'study sessions saved to MongoDB' : 'no MONGODB_URI: study sessions stay in the browser';
   console.log(`Mind Palace on http://localhost:${PORT}  (${ai}; ${db})`);
 });

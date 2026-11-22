@@ -1,5 +1,24 @@
 {
   "functions": {
-    "api/study.js": { "includeFiles": "data/**" }
-  }
+    "api/study.js": {
+      "includeFiles": "data/**"
+    }
+  },
+  "redirects": [
+    {
+      "source": "/lib/:path*",
+      "destination": "/",
+      "permanent": false
+    },
+    {
+      "source": "/scripts/:path*",
+      "destination": "/",
+      "permanent": false
+    },
+    {
+      "source": "/server.mjs",
+      "destination": "/",
+      "permanent": false
+    }
+  ]
 }
