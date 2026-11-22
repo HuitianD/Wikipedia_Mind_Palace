@@ -35,8 +35,13 @@ const dir = path.join(root, 'data', 'palaces');
 /** List every palace file so the app knows which articles are ready-made. */
 async function writeIndex() {
   const files = (await fs.readdir(dir)).filter((f) => f.endsWith('.json') && f !== 'index.json').sort();
+  // The study's article (data/study.json) is not offered as a ready-made palace:
+  // participants must not be able to read it in the Demo before or between their sessions.
+  const study = JSON.parse(await fs.readFile(path.join(root, 'data/study.json'), 'utf8').catch(() => '{}'));
+  const studyFiles = new Set((study.articles || []).map((a) => a.palace));
   const list = [];
   for (const f of files) {
+    if (studyFiles.has(`data/palaces/${f}`)) continue;
     const p = JSON.parse(await fs.readFile(path.join(dir, f), 'utf8'));
     list.push({ title: p.title, file: `data/palaces/${f}`, theme: p.theme, stops: p.chunks.length });
   }

@@ -18,13 +18,14 @@
   <section id="landing" hidden>
     <div class="board">
       <nav class="modes" aria-label="Mode">
-        <a class="on" href="./" aria-current="page">Explore</a>
-        <a href="?study" title="Timed session for the user study: sign in, read for 15 minutes, then the page closes">Study session</a>
+        <a id="mode-demo" href="./" title="Try the ready-made palaces. No sign-in.">Demo</a>
+        <a id="mode-explore" href="?explore" title="Build a palace for any Wikipedia article, with Claude. Needs a Brown Google sign-in.">Explore</a>
+        <a href="?study" title="Timed session for the user study: sign in, read for 15 minutes, take the quiz">Study session</a>
       </nav>
       <div class="eyebrow">Wikipedia Mind Palace</div>
       <h1>Walk through what you read.</h1>
-      <p class="lead">Turn a Wikipedia article into a room. Each section becomes an object you choose, placed along a path. Retrace the path later to remember it.</p>
-      <form id="search-form" autocomplete="off">
+      <p class="lead" id="landing-lead">Turn a Wikipedia article into a room. Each section becomes an object you choose, placed along a path. Retrace the path later to remember it.</p>
+      <form id="search-form" autocomplete="off" hidden>
         <label for="q">Enter or search for an article</label>
         <div class="search">
           <input id="q" type="text" placeholder="Honey bee, or a wikipedia.org/wiki/… link" spellcheck="false">
@@ -34,12 +35,12 @@
       </form>
       <div id="access" hidden></div>
       <div id="ready" hidden>
-        <div class="ready-label">Ready-made palaces <span>open instantly</span></div>
+        <div class="ready-label"><span id="ready-title">Ready-made palaces</span> <span>open instantly</span></div>
         <div id="ready-list"></div>
       </div>
       <div class="alt">
         <button id="resume" type="button" hidden>Resume</button>
-        <button id="open-file" type="button">Open a palace file</button>
+        <button id="open-file" type="button" hidden>Open a palace file</button>
       </div>
       <p id="landing-error" class="error" hidden></p>
     </div>

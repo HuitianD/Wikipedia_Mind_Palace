@@ -1,7 +1,7 @@
-// Sign-in for Claude's suggestions (Explore mode). The server decides who may use
-// Claude (lib/access.js); this file shows the "Sign in with Google" button on the
-// start page and keeps the session token. Ready-made palaces and keyword suggestions
-// never need a sign-in.
+// Sign-in for Explore mode. Explore asks Claude about any article, which costs money,
+// so the server only lets signed-in people use it (lib/access.js). This file shows the
+// "Sign in with Google" button on the Explore page and keeps the session token.
+// Demo mode (the ready-made palaces) and the study never need this sign-in.
 
 const TOKEN_KEY = 'wmp.access.token.v1';
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -10,10 +10,17 @@ const store = {
   set(v) { try { v ? localStorage.setItem(TOKEN_KEY, v) : localStorage.removeItem(TOKEN_KEY); } catch { /* private mode */ } },
 };
 
-/** claude: 'unknown' (no server answer yet / static hosting) | 'off' | 'open' | 'signin' */
-export const access = { claude: 'unknown', domains: [], dailyLimit: 0, clientId: '', hd: '', user: null, token: store.get() };
+/**
+ * claude: 'unknown' – no answer from the server (plain static hosting): keyword suggestions
+ *         'signin'  – Explore needs a Google sign-in
+ *         'open'    – no sign-in set up on this computer (local development): Claude is open
+ *         'off'     – why 'no_key': no API key, keyword suggestions; why 'no_signin': a
+ *                     public site without sign-in set up, so Explore is closed
+ */
+export const access = { claude: 'unknown', why: null, domains: [], dailyLimit: 0, clientId: '', hd: '', user: null, token: store.get() };
 
 let box = null;
+let onChange = () => {};
 let problem = '';
 
 async function post(body) {
@@ -24,8 +31,10 @@ async function post(body) {
 }
 
 export const domainText = () => access.domains.map((d) => `@${d}`).join(' or ');
-/** True when Claude would refuse because nobody is signed in. */
+/** True when Explore is waiting for someone to sign in. */
 export const needsSignIn = () => access.claude === 'signin' && !access.user;
+/** True when this visitor may build a palace from any article. */
+export const canExplore = () => !needsSignIn() && !(access.claude === 'off' && access.why === 'no_signin');
 
 export function signOut() {
   access.user = null;
@@ -68,21 +77,32 @@ async function onCredential(response) {
 }
 
 async function render() {
+  onChange();
   if (!box) return;
-  if (access.claude !== 'signin') { box.hidden = true; return; }
-  box.hidden = false;
+  box.hidden = access.claude === 'unknown';
+  if (access.claude === 'open') {
+    box.innerHTML = '<p><strong>Sign-in is off on this computer.</strong> No <code>GOOGLE_CLIENT_ID</code> is set here, so Claude is open to anyone using this server. On the public site, Explore asks for a Brown Google sign-in first.</p>';
+    return;
+  }
+  if (access.claude === 'off') {
+    box.innerHTML = access.why === 'no_signin'
+      ? '<p><strong>Explore is not open on this site yet.</strong> It needs Google sign-in, which has not been set up here (<code>GOOGLE_CLIENT_ID</code>). The Demo works without it.</p>'
+      : '<p><strong>No Claude API key on this server.</strong> You can still build a palace for any article: the setting and objects are then matched by keywords.</p>';
+    return;
+  }
+  if (access.claude !== 'signin') return;
   if (access.user) {
     const left = access.user.remaining;
     box.innerHTML = `
-      <p><strong>Signed in as ${esc(access.user.email)}.</strong> Claude picks the setting and objects for any article
-      (${left} of ${access.dailyLimit} request${access.dailyLimit === 1 ? '' : 's'} left today).
+      <p><strong>Signed in as ${esc(access.user.email)}.</strong>
+      ${left} of ${access.dailyLimit} Claude request${access.dailyLimit === 1 ? '' : 's'} left today.
       <button type="button" class="link" id="access-out">Sign out</button></p>`;
     box.querySelector('#access-out').addEventListener('click', signOut);
     return;
   }
   box.innerHTML = `
-    <p><strong>Any other article:</strong> sign in with a Brown account (${esc(domainText())}) and Claude picks the setting and objects.
-    Without signing in, objects are matched by keywords. The ready-made palaces are open to everyone.</p>
+    <p><strong>Sign in to use Explore.</strong> Explore asks Claude to pick the setting and objects for any Wikipedia article,
+    so it is open to Brown accounts (${esc(domainText())}). The Demo needs no sign-in.</p>
     <div id="access-button"></div>
     ${problem ? `<p class="error" role="alert">${esc(problem)}</p>` : ''}`;
   try {
@@ -90,7 +110,7 @@ async function render() {
     const slot = box.querySelector('#access-button');
     if (!slot || access.user) return; // re-rendered while the script was loading
     window.google.accounts.id.initialize({ client_id: access.clientId, callback: onCredential, ...(access.hd ? { hd: access.hd } : {}) });
-    window.google.accounts.id.renderButton(slot, { type: 'standard', theme: 'outline', size: 'medium', text: 'signin_with', shape: 'pill', locale: 'en' });
+    window.google.accounts.id.renderButton(slot, { type: 'standard', theme: 'outline', size: 'large', text: 'signin_with', shape: 'pill', locale: 'en' });
   } catch (err) {
     const slot = box.querySelector('#access-button');
     if (slot) slot.innerHTML = `<p class="error">${esc(err.message)}</p>`;
@@ -98,12 +118,17 @@ async function render() {
 }
 
 let loading = null;
-/** Ask the server whether Claude needs a sign-in here; resolves when known. */
-export function loadAccess(el) {
+/**
+ * Ask the server whether Explore needs a sign-in here; resolves when known.
+ * `el` is where the sign-in box goes; `changed` is called whenever the answer or the
+ * signed-in person changes.
+ */
+export function loadAccess(el, changed) {
   if (el) box = el;
+  if (changed) onChange = changed;
   return (loading ??= post({ action: 'config', token: access.token || undefined })
     .then((cfg) => {
-      Object.assign(access, { claude: cfg.claude, domains: cfg.domains || [], dailyLimit: cfg.dailyLimit || 0, clientId: cfg.clientId || '', hd: cfg.hd || '', user: cfg.user || null });
+      Object.assign(access, { claude: cfg.claude, why: cfg.why || null, domains: cfg.domains || [], dailyLimit: cfg.dailyLimit || 0, clientId: cfg.clientId || '', hd: cfg.hd || '', user: cfg.user || null });
       if (!access.user && access.token) { access.token = null; store.set(null); } // expired or no longer allowed
     })
     .catch(() => { /* no /api/auth (plain static hosting): leave 'unknown', suggestions fall back as before */ })

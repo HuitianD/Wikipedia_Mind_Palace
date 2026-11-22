@@ -18,18 +18,22 @@ everything still works: the app shows a notice and falls back to the offline key
 public site, Claude is limited to people who sign in with a Brown account (see "Who can use Claude"). three.js
 loads from jsDelivr, so the browser needs internet access.
 
-The app has two modes, switched at the top of the landing page:
+The app has three modes, switched at the top of the landing page:
 
-- **Explore** (`/`): the live app. Any Wikipedia article, with Claude suggesting the setting and objects.
-  Ten articles are ready-made and open instantly (see below).
-- **Study session** (`/?study`): the timed version for the user study. Sign-in, a fixed article, a
-  countdown, and a page that closes when the time is up. With a MongoDB database, participants can do
-  this on their own computers and the data is collected in one place.
+- **Demo** (`/`): the nine ready-made palaces (see below). Open to everyone: no sign-in, no Claude, no
+  cost.
+- **Explore** (`/?explore`): the full app. Any Wikipedia article, with Claude suggesting the setting and
+  objects. Needs a Google sign-in with a Brown account (see "Who can use Claude"); until someone signs in,
+  the page shows the sign-in button instead of the search box.
+- **Study session** (`/?study`): the timed version for the user study. Its own sign-in (name, email, age;
+  no Google account), a fixed article, a countdown and the memory quiz. With a MongoDB database,
+  participants can do this on their own computers and the data is collected in one place.
 
 | URL | What it opens |
 |---|---|
-| `/` | Explore mode: search any article |
-| `/?article=Roman%20Empire` | build a palace for that article right away |
+| `/` | Demo mode: the ready-made palaces |
+| `/?explore` | Explore mode: sign in, then search any article |
+| `/?article=Roman%20Empire` | Explore mode, building a palace for that article right away (after sign-in) |
 | `/?sample` | the ready-made Honey bee palace |
 | `/?study` | **Study session mode** (see below): what participants open |
 | `/?study=admin` | the research team's page: everyone who signed in, downloads |
@@ -77,8 +81,12 @@ are fixed, so they open at once and Claude is not called. They are listed in `da
 and shown as buttons on the landing page. Typing one of their titles, following a link to one, or
 arriving from the extension opens the ready-made palace too. Any other article is built live with Claude.
 
-Currently: Black hole, Chasse-galerie (the study article), Great Wall of China, Honey bee, Jazz, Leonardo
-da Vinci, Photosynthesis, Roman Empire, Solar System, Volcano.
+Currently: Black hole, Great Wall of China, Honey bee, Jazz, Leonardo da Vinci, Photosynthesis, Roman
+Empire, Solar System, Volcano.
+
+The study's article (Chasse-galerie) has a pre-built palace too, but it is left out of this list on
+purpose, so participants cannot read it in the Demo before or between their sessions. The build script
+skips every article named in `data/study.json` when it writes the index; the study loads its file directly.
 
 To add one (uses `ANTHROPIC_API_KEY`, one Claude call, and updates the index):
 
@@ -121,6 +129,10 @@ Set `MONGODB_URI` and `STUDY_ADMIN_KEY` (see `.env.example`) and `/?study` becom
 - **The server keeps the clock.** A reload, another computer or a changed system clock cannot add time.
 - **One email address, one session.** Signing in again with the same address, on any computer, continues
   that session with the clock still running, or shows the closed screen if it is over.
+- **The link asks who is there, every time.** A finished session is not remembered by the browser, so the
+  next person on the same computer gets the sign-in page, and only the same email address leads back to
+  that session. The exception is a session in the middle of reading or of a quiz: a reload continues it at
+  once, so no time is lost.
 - **Progress is saved as they go** (about 1.5 s after each action, and when the page is closed), so a
   crash loses almost nothing. If nobody presses *I'm done* and the page is closed, the session counts as
   timed out once the 15 minutes have passed.
@@ -194,10 +206,12 @@ The ready-made palaces, the keyword suggestions and the study are free and need 
   article). With `MONGODB_URI` set, the count is kept in the `usage` collection (email, day, count;
   rows delete themselves after 30 days). Without a database it is counted in memory, which Vercel does
   not keep between server instances, so set `MONGODB_URI` for a limit that holds.
-- Someone not signed in, or over the limit, still gets a palace for any article: the objects are then
-  matched by keywords, and a notice says so.
-- Without `GOOGLE_CLIENT_ID`, Claude is open to everyone on your own computer (`npm run dev`) and
-  **switched off on Vercel**, so a deployment cannot expose the key by accident.
+- Someone not signed in sees the sign-in button in place of the search box. Someone over the limit, or
+  hit by a Claude error, still gets the palace: the objects are then matched by keywords, and a notice
+  says so.
+- Without `GOOGLE_CLIENT_ID`, Claude is open to everyone on your own computer (`npm run dev`) and the
+  Explore page says so; put a client ID in `.env` to see the sign-in button locally. On Vercel, Explore is
+  **switched off** without it, so a deployment cannot expose the key by accident.
 
 To get a client ID: Google Cloud console > APIs & Services > Credentials > Create credentials > OAuth
 client ID > Web application. Under "Authorized JavaScript origins" add the site's address

@@ -197,16 +197,27 @@ function showProblem(message) {
 
 // ---- online sessions ---------------------------------------------------------------
 
+/** In the middle of something: a clock may be running, or a step is half done. */
+const inProgress = (sv) => !!sv.startedAt && (!sv.endedAt || !sv.quiz?.submittedAt || (!!sv.retake && !sv.retake.submittedAt));
+
+/**
+ * Opening the study link asks who is there, every time: several people may use the same
+ * browser, and a finished session must not shut the next person out. The one exception is
+ * a session that is in the middle of reading or of a quiz. That one continues at once, so a
+ * reload costs no time. Whoever signs in with an email address that already took part gets
+ * that person's session back, wherever it stands.
+ */
 async function bootOnline() {
   token = store.get(TOKEN_KEY);
   if (token) {
     try {
-      return await enterOnline(await api('resume', { token }));
+      const r = await api('resume', { token });
+      if (inProgress(r.session)) return await enterOnline(r);
     } catch (err) {
-      if (err.status !== 401) return showProblem(err.message);
-      store.del(TOKEN_KEY); // the session was removed on the server
-      token = null;
+      if (err.status !== 401) return showProblem(err.message); // 401: the session was removed on the server
     }
+    store.del(TOKEN_KEY);
+    token = null;
   }
   showSignIn();
 }
@@ -240,7 +251,8 @@ function showSetup() {
   const articles = config.articles.map((a) => `<option value="${esc(a.id)}">${esc(a.title)}</option>`).join('');
   showOverlay(`
     <nav class="modes" aria-label="Mode">
-      <a href="${esc(location.pathname)}" title="Build a palace for any Wikipedia article">Explore</a>
+      <a href="${esc(location.pathname)}" title="Try the ready-made palaces">Demo</a>
+      <a href="${esc(location.pathname)}?explore" title="Build a palace for any Wikipedia article">Explore</a>
       <a class="on" href="${esc(location.pathname)}?study" aria-current="page">Study session</a>
     </nav>
     <div class="eyebrow">Researcher setup</div>
@@ -333,7 +345,7 @@ function showSignIn() {
       <p class="error" id="signin-error" hidden></p>
       <div class="actions"><button class="primary" type="submit">Continue</button></div>
     </form>
-    <p class="fine">The timer has not started yet. Next comes a short introduction; your ${mins} begin when you press <b>Start reading</b>.${s ? '' : ' You can take part once. If you were interrupted, sign in with the same email to pick up where you were; the clock keeps running while you are away.'}</p>
+    <p class="fine">The timer has not started yet. Next comes a short introduction; your ${mins} begin when you press <b>Start reading</b>.${s ? '' : ' Each email address can take part once. If you have been here before (you were interrupted, or you are back for the follow-up quiz), sign in with the same email address and you continue where you were.'}</p>
     ${s ? `<details class="researcher">
       <summary>Researcher</summary>
       <p>Session <b>${esc(s.participant)}</b> · ${s.condition === 'palace' ? 'Mind Palace' : 'Standard article'} · ${s.readingMinutes} min</p>

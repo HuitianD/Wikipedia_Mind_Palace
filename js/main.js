@@ -4,12 +4,20 @@ import { THEMES, pickTheme, suggestObjects, explain } from './mapper.js';
 import { OBJECTS, OBJECT_BY_ID } from './catalog.js';
 import { study, bootStudy, log as studyLog, saveStudy, finishEarly } from './study.js';
 import { findAnchors } from './anchors.js';
-import { access, loadAccess, needsSignIn, domainText, sessionExpired, setRemaining } from './access.js';
+import { access, loadAccess, needsSignIn, canExplore, sessionExpired, setRemaining } from './access.js';
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const paras = (t) => t.split(/\n+/).filter(Boolean).map((p) => `<p>${esc(p)}</p>`).join('');
 const STORE_KEY = 'wmp.palace.v1';
+
+// The three modes of the site, chosen by the address:
+//   demo    (/)          the ready-made palaces only. Open to everyone, no sign-in, no Claude.
+//   explore (/?explore)  a palace for any Wikipedia article, with Claude. Needs the Google
+//                        sign-in (js/access.js). /?article=… also lands here.
+//   study   (/?study)    the timed user-study session, with its own sign-in (js/study.js).
+const params = new URLSearchParams(location.search);
+const MODE = params.has('study') ? 'study' : params.has('explore') || params.has('article') ? 'explore' : 'demo';
 
 const room = new Room($('#scene'));
 room.setTheme(THEMES.library);
@@ -179,7 +187,25 @@ function showLanding() {
   const resume = $('#resume');
   resume.hidden = !saved?.chunks?.length;
   if (saved?.title) resume.textContent = `Resume “${saved.title}”`;
-  $('#q').focus();
+  renderLandingMode();
+  if (!$('#search-form').hidden) $('#q').focus();
+}
+
+/** Show the parts of the start page that belong to this mode (and, in Explore, to this visitor). */
+function renderLandingMode() {
+  const explore = MODE === 'explore';
+  for (const [id, on] of [['#mode-demo', !explore], ['#mode-explore', explore]]) {
+    $(id).classList.toggle('on', on);
+    if (on) $(id).setAttribute('aria-current', 'page'); else $(id).removeAttribute('aria-current');
+  }
+  $('#landing-lead').textContent = explore
+    ? 'Turn any Wikipedia article into a room. Claude suggests the setting and an object for each section; you choose, and retrace the path later to remember it.'
+    : 'Turn a Wikipedia article into a room. Each section becomes an object you choose, placed along a path. Retrace the path later to remember it. Pick an article below to try it.';
+  $('#search-form').hidden = !(explore && canExplore());
+  $('#open-file').hidden = !explore;
+  if (!explore) $('#access').hidden = true;
+  $('#ready-title').textContent = explore ? 'Or a ready-made palace' : 'Ready-made palaces';
+  document.querySelector('.alt').hidden = $('#resume').hidden && $('#open-file').hidden;
 }
 
 function showError(msg) {
@@ -217,7 +243,7 @@ async function requestClaude(title, chunks) {
 
 /** Why Claude was not used, as a short message for the reader. */
 function fallbackNotice(err) {
-  if (err.code === 'signin') return `Not signed in, so the objects are matched by keywords. For Claude's suggestions, sign in with a ${domainText() || 'Brown'} account on the start page.`;
+  if (err.code === 'signin') return 'Your sign-in has expired, so the objects are matched by keywords. Sign in again on the Explore page for Claude\'s suggestions.';
   if (err.code === 'limit') return `${err.message} Using keyword suggestions instead.`;
   return `Claude suggestions unavailable (${err.message.replace(/\.$/, '')}). Using keyword suggestions instead.`;
 }
@@ -231,8 +257,8 @@ function keywordSuggestions(chunks) {
   });
 }
 
-// Whether Claude needs a sign-in on this site. Only asked in Explore mode: the study
-// never uses Claude, so its pages never contact the sign-in provider.
+// Whether Claude needs a sign-in on this site. Only asked in Explore mode: the Demo and
+// the study never use Claude, so their pages never contact the sign-in provider.
 let accessReady = Promise.resolve();
 
 // ---- ready-made palaces ---------------------------------------------------------------
@@ -321,6 +347,13 @@ const startFromTitle = async (input) => {
   showError('');
   const ready = await findReady(title);
   if (ready && await openReady(ready)) return;
+  if (MODE !== 'explore') return showError('That palace could not be opened. Please try another one.');
+  // anything that is not ready-made is built with Claude, which needs the Explore sign-in
+  await accessReady;
+  if (!canExplore()) {
+    $('#q').value = title;
+    return showError(needsSignIn() ? `Sign in above to build a palace for “${title}”.` : 'Explore is not open on this site yet.');
+  }
   buildFromArticle(() => fetchArticle(title));
 };
 const startSample = () => startFromTitle('Honey bee');
@@ -822,8 +855,7 @@ function exportPalace() {
 
 // ---- boot ------------------------------------------------------------------------------------
 
-const params = new URLSearchParams(location.search);
-if (params.has('study')) {
+if (MODE === 'study') {
   $('#landing').hidden = true;
   room.mode = 'landing';
   bootStudy({
@@ -834,7 +866,8 @@ if (params.has('study')) {
     lockPalace: () => { hideCandidates(); closePanel(); setHint(''); $('#topbar').hidden = true; room.mode = 'landing'; },
   }, params.get('study'));
 } else {
-  accessReady = loadAccess($('#access'));
+  // only Explore talks to the sign-in server; the Demo needs nothing
+  if (MODE === 'explore') accessReady = loadAccess($('#access'), () => { if (view.mode === 'landing') renderLandingMode(); });
   showLanding();
   if (params.get('article')) {
     $('#q').value = params.get('article');

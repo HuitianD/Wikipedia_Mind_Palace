@@ -6,12 +6,6 @@
     "stops": 8
   },
   {
-    "title": "Chasse-galerie",
-    "file": "data/palaces/chasse-galerie.json",
-    "theme": "library",
-    "stops": 7
-  },
-  {
     "title": "Great Wall of China",
     "file": "data/palaces/great-wall-of-china.json",
     "theme": "museum",
