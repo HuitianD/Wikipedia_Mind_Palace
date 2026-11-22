@@ -1,0 +1,11 @@
+{
+  "readingMinutes": 15,
+  "afterReadingUrl": "",
+  "articles": [
+    {
+      "id": "chasse-galerie",
+      "title": "Chasse-galerie",
+      "palace": "data/palaces/chasse-galerie.json"
+    }
+  ]
+}

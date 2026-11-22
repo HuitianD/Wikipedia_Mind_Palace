@@ -1,0 +1,5 @@
+#wmp-open {
+  display: inline-block; margin: 6px 0 4px; padding: 6px 14px; border-radius: 999px;
+  background: #9b4d1f; color: #fff !important; font: 600 14px/1.2 -apple-system, sans-serif; text-decoration: none !important;
+}
+#wmp-open:hover { background: #843f16; }

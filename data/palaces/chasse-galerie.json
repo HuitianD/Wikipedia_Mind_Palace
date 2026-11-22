@@ -1,0 +1,278 @@
+{
+  "format": "wikipedia-mind-palace",
+  "version": 2,
+  "title": "Chasse-galerie",
+  "url": "https://en.wikipedia.org/wiki/Chasse-galerie",
+  "retrieved": "2026-11-22",
+  "license": "Article text from Wikipedia, CC BY-SA 4.0",
+  "theme": "library",
+  "themeReason": "Set by hand when the settings were redesigned: a folktale best known from its written versions fits the library.",
+  "suggestedBy": {
+    "source": "claude",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-22T01:43:18.870Z"
+  },
+  "createdAt": "2026-11-22T01:43:18.872Z",
+  "chunks": [
+    {
+      "id": "c0",
+      "heading": "Overview · Origin",
+      "parts": [
+        {
+          "heading": "Overview",
+          "section": "Overview",
+          "text": "La Chasse-galerie, also known as \"The Bewitched Canoe\" or \"The Flying Canoe\", is a popular French-Canadian tale of lumberjacks from camps working around the Gatineau River who make a deal with the devil, a variant of the Wild Hunt. Its best-known version was written by Honoré Beaugrand (1848–1906). It was published in The Century Magazine in August 1892.",
+          "full": "La Chasse-galerie, also known as \"The Bewitched Canoe\" or \"The Flying Canoe\", is a popular French-Canadian tale of lumberjacks from camps working around the Gatineau River who make a deal with the devil, a variant of the Wild Hunt. Its best-known version was written by Honoré Beaugrand (1848–1906). It was published in The Century Magazine in August 1892.",
+          "trimmed": false
+        },
+        {
+          "heading": "Origin",
+          "section": "Origin",
+          "text": "The story has origins in a French legend about a rich nobleman named Gallery who loved to hunt. He loved it so much that he refused to attend Sunday mass. As punishment for this sin he was condemned to fly forever through the night skies, chased by galloping horses and howling wolves, in a fashion reminiscent of the Wild Hunt stories.\nWhen French settlers arrived in Canada, they swapped stories with the natives and the tale of Gallery was combined with a First Nations legend about a flying canoe. In time, bark canoes became associated with French-Canadian culture as well; when some of the earliest French-Canadians arrived in New York City, they were reported to have landed on the banks of the Hudson River to \"the amazement and admiration of the people, who had never seen bark canoes in their waters before\".",
+          "full": "The story has origins in a French legend about a rich nobleman named Gallery who loved to hunt. He loved it so much that he refused to attend Sunday mass. As punishment for this sin he was condemned to fly forever through the night skies, chased by galloping horses and howling wolves, in a fashion reminiscent of the Wild Hunt stories.\nWhen French settlers arrived in Canada, they swapped stories with the natives and the tale of Gallery was combined with a First Nations legend about a flying canoe. In time, bark canoes became associated with French-Canadian culture as well; when some of the earliest French-Canadians arrived in New York City, they were reported to have landed on the banks of the Hudson River to \"the amazement and admiration of the people, who had never seen bark canoes in their waters before\".",
+          "trimmed": false
+        }
+      ],
+      "suggestions": [
+        {
+          "id": "horse",
+          "why": "Rocking horse: galloping horses chase the nobleman Gallery through the night skies forever."
+        },
+        {
+          "id": "chapel",
+          "why": "Chapel: Gallery skipped Sunday mass to hunt, and was condemned for it."
+        },
+        {
+          "id": "bow",
+          "why": "Bow: the rich nobleman Gallery loved hunting more than attending mass."
+        },
+        {
+          "id": "newspaper",
+          "why": "Newspapers: Beaugrand's version appeared in The Century Magazine in August 1892."
+        },
+        {
+          "id": "ship",
+          "why": "Model ship: French settlers merged Gallery's tale with a First Nations flying canoe legend."
+        }
+      ],
+      "objectId": null
+    },
+    {
+      "id": "c1",
+      "heading": "Variations",
+      "parts": [
+        {
+          "heading": "Variations",
+          "section": "Variations",
+          "text": "After a night of heavy drinking on New Year's Eve, a group of voyageurs working at a remote timber camp yearn to visit their sweethearts some 100 leagues (500 kilometres) away. The only way to make such a long journey, and be back in time for work the next morning, is to run the chasse-galerie. Running the chasse-galerie means making a pact with the Devil so that their canoe can travel through the air to their destination quickly. However, the travellers must not mention God's name or touch the cross of any church steeple as they whisk by in the flying canoe. If either of these rules is broken during the voyage, then the Devil will take their souls. This in mind, the men promise not to touch another drop of rum, to keep their heads clear. The crew take their places in the canoe which begins to rise off the ground. They start to paddle. Far below they see the frozen Gatineau River, many villages, plenty of shiny church steeples and even the lights of Montreal. The bewitched canoe eventually touches down near a house where New Year's Eve festivities are in full swing. No one questions the trappers'/loggers' sudden arrival. They are embraced with open arms and soon are dancing and celebrating as merrily as everyone else. After spending time with their sweethearts and enjoying the festivities, the men notice it is late and know they must leave if they are to get back to camp in time for work. As they fly through the moonless night, it becomes apparent that their navigator had been drinking as he steers the canoe on a dangerously unsteady course. While passing over Montreal, they narrowly miss running into a church steeple, and soon after the canoe ends up stuck in a deep snowdrift. The drunken navigator starts swearing and taking the Lord's name in vain. Terrified the devil will take their souls, the men bind and gag their friend and elect another to steer. The navigator soon breaks his bonds and begins swearing again. The crew become more and more shaken at the possibility of losing their souls, and they accidentally steer the bewitched canoe right into a tall pine. The men spill out of the canoe, and are knocked unconscious.",
+          "full": "After a night of heavy drinking on New Year's Eve, a group of voyageurs working at a remote timber camp yearn to visit their sweethearts some 100 leagues (500 kilometres) away. The only way to make such a long journey, and be back in time for work the next morning, is to run the chasse-galerie. Running the chasse-galerie means making a pact with the Devil so that their canoe can travel through the air to their destination quickly. However, the travellers must not mention God's name or touch the cross of any church steeple as they whisk by in the flying canoe. If either of these rules is broken during the voyage, then the Devil will take their souls. This in mind, the men promise not to touch another drop of rum, to keep their heads clear. The crew take their places in the canoe which begins to rise off the ground. They start to paddle. Far below they see the frozen Gatineau River, many villages, plenty of shiny church steeples and even the lights of Montreal. The bewitched canoe eventually touches down near a house where New Year's Eve festivities are in full swing. No one questions the trappers'/loggers' sudden arrival. They are embraced with open arms and soon are dancing and celebrating as merrily as everyone else. After spending time with their sweethearts and enjoying the festivities, the men notice it is late and know they must leave if they are to get back to camp in time for work. As they fly through the moonless night, it becomes apparent that their navigator had been drinking as he steers the canoe on a dangerously unsteady course. While passing over Montreal, they narrowly miss running into a church steeple, and soon after the canoe ends up stuck in a deep snowdrift. The drunken navigator starts swearing and taking the Lord's name in vain. Terrified the devil will take their souls, the men bind and gag their friend and elect another to steer. The navigator soon breaks his bonds and begins swearing again. The crew become more and more shaken at the possibility of losing their souls, and they accidentally steer the bewitched canoe right into a tall pine. The men spill out of the canoe, and are knocked unconscious.",
+          "trimmed": false
+        }
+      ],
+      "suggestions": [
+        {
+          "id": "canoe",
+          "why": "Flying canoe: voyageurs paddle through the air to sweethearts 500 kilometres away."
+        },
+        {
+          "id": "barrel",
+          "why": "Barrel: the drunken navigator swears, breaking the pact after promising no rum."
+        },
+        {
+          "id": "pine",
+          "why": "Pine tree: the bewitched canoe crashes into a tall pine, knocking men unconscious."
+        },
+        {
+          "id": "cake",
+          "why": "Tiered cake: the men dance at New Year's Eve festivities with their sweethearts."
+        },
+        {
+          "id": "bell",
+          "why": "Bell: they must never touch the cross on any church steeple."
+        }
+      ],
+      "objectId": null
+    },
+    {
+      "id": "c2",
+      "heading": "Variations (continued)",
+      "parts": [
+        {
+          "heading": "Variations (continued)",
+          "section": "Variations",
+          "text": "The ending of the story changes from version to version. In some versions, the men are sentenced to fly the canoe through Hell. They appear in the sky every New Year's Eve but, in all but one version, all the men escape the terms the devil (Lucifer) made.\nSeveral different versions of this legend exist. An Acadian version involves an axe handle. It stretches to accommodate as many as climb on.\nAnother variation has the devil himself steering and deliberately trying to break the rules on the return journey, at which point they throw him out of the canoe to save themselves.\nIn English, this particular legend is known as \"The Canoe\", or \"The Wild Hunt Bewitched\". The second name is used to translate precisely chasse-galerie as it is known in Canadian French; the other term is much broader.",
+          "full": "The ending of the story changes from version to version. In some versions, the men are sentenced to fly the canoe through Hell. They appear in the sky every New Year's Eve but, in all but one version, all the men escape the terms the devil (Lucifer) made.\nSeveral different versions of this legend exist. An Acadian version involves an axe handle. It stretches to accommodate as many as climb on.\nAnother variation has the devil himself steering and deliberately trying to break the rules on the return journey, at which point they throw him out of the canoe to save themselves.\nIn English, this particular legend is known as \"The Canoe\", or \"The Wild Hunt Bewitched\". The second name is used to translate precisely chasse-galerie as it is known in Canadian French; the other term is much broader.",
+          "trimmed": false
+        }
+      ],
+      "suggestions": [
+        {
+          "id": "trident",
+          "why": "Devil's pitchfork: some versions sentence the men to fly the canoe through Hell."
+        },
+        {
+          "id": "axe",
+          "why": "Axe: in the Acadian version, an axe handle stretches to carry all riders."
+        },
+        {
+          "id": "moon",
+          "why": "Moon globe: the men appear in the sky every New Year's Eve."
+        },
+        {
+          "id": "key",
+          "why": "Giant key: in nearly every version the men escape Lucifer's terms."
+        },
+        {
+          "id": "bookshelf",
+          "why": "Bookshelf: in English it's called 'The Canoe' or 'The Wild Hunt Bewitched'."
+        }
+      ],
+      "objectId": null
+    },
+    {
+      "id": "c3",
+      "heading": "Variations (continued)",
+      "parts": [
+        {
+          "heading": "Variations (continued)",
+          "section": "Variations",
+          "text": "In Quebec, the best-known version is written by Honoré Beaugrand. This is the story of the Gatineau loggers who make a pact with the devil in order to steal a boat so they can visit their women. They are warned, however, not to blaspheme during the voyage, or touch crosses atop church steeples, and they must be back before six o'clock the next morning. Otherwise they would lose their souls. In his version, the devil (Lucifer) is rather generous, and allows the men to return unhurt and undamaged.\nThe tale appeared in a book of French-Canadian folktales called Legends of French Canada by Edward C. Woodley, published in 1931, republished in 1938. The tale is told as a recollection of one of the men who made chasse-galerie. The men travel from St. Maurice to St. Jean. The return accident is credited to whiskey-blanc.\nAn earlier volume in English, entitled The Flying Canoe (La Chasse-Galerie) was written by J.E. LeRossignol, by McClelland & Stewart Publishers in 1929. In it, thanks is given (with no further publication information) to \"the Toronto Star Weekly, and the Canadian Home Journal for their courteous permission to republish certain stories which appeared originally in these journals.\"\nIn 2015, a musical theatre version of the story was performed at the Storefront Theatre in Toronto. It won two Dora Awards and two Toronto Theatre Critics Awards. A larger production was mounted in 2016 by Soulpepper Theatre.",
+          "full": "In Quebec, the best-known version is written by Honoré Beaugrand. This is the story of the Gatineau loggers who make a pact with the devil in order to steal a boat so they can visit their women. They are warned, however, not to blaspheme during the voyage, or touch crosses atop church steeples, and they must be back before six o'clock the next morning. Otherwise they would lose their souls. In his version, the devil (Lucifer) is rather generous, and allows the men to return unhurt and undamaged.\nThe tale appeared in a book of French-Canadian folktales called Legends of French Canada by Edward C. Woodley, published in 1931, republished in 1938. The tale is told as a recollection of one of the men who made chasse-galerie. The men travel from St. Maurice to St. Jean. The return accident is credited to whiskey-blanc.\nAn earlier volume in English, entitled The Flying Canoe (La Chasse-Galerie) was written by J.E. LeRossignol, by McClelland & Stewart Publishers in 1929. In it, thanks is given (with no further publication information) to \"the Toronto Star Weekly, and the Canadian Home Journal for their courteous permission to republish certain stories which appeared originally in these journals.\"\nIn 2015, a musical theatre version of the story was performed at the Storefront Theatre in Toronto. It won two Dora Awards and two Toronto Theatre Critics Awards. A larger production was mounted in 2016 by Soulpepper Theatre.",
+          "trimmed": false
+        }
+      ],
+      "suggestions": [
+        {
+          "id": "clock",
+          "why": "Grandfather clock: the loggers must return before six o'clock next morning."
+        },
+        {
+          "id": "masks",
+          "why": "Theatre masks: a 2015 Toronto musical version won two Dora Awards."
+        },
+        {
+          "id": "storybook",
+          "why": "Storybook: Woodley's 1931 Legends of French Canada retells the tale."
+        },
+        {
+          "id": "typewriter",
+          "why": "Typewriter: J.E. LeRossignol wrote The Flying Canoe in English in 1929."
+        },
+        {
+          "id": "trophy",
+          "why": "Trophy: the musical also won two Toronto Theatre Critics Awards."
+        }
+      ],
+      "objectId": null
+    },
+    {
+      "id": "c4",
+      "heading": "In popular culture",
+      "parts": [
+        {
+          "heading": "In popular culture",
+          "section": "In popular culture",
+          "text": "A Canadian 40¢ postage stamp was issued in 1991 (as the Witched Canoe), illustrating this legend (Canadian Scott #1334 or #1445), which forms part of a series on Canadian folktales.\nOne of the oldest rides at Montreal's La Ronde amusement park, La Pitoune, uses this legend as inspiration. It is a basic sawmill log ride, but overhead is a representation of the flying canoe, with the devil perched behind the terrified men. The high bench at the back of the log-cars is therefore referred to as \"the devil-seat\". It closed down during the 2016 season.\nThe legend serves as the label motif for Maudite, an ale produced by the Unibroue brewery of Quebec.\nThe science fiction author Gordon R. Dickson wrote a novelette titled \"The Immortal\" in 1965, which was later incorporated into the collection Mutants (1970). A French-Canadian spaceman, piloting a spaceship called \"la Chasse Gallerie\" (the misspelling is consistent through the story), is the victim of an attack by aliens that misfires, sending his ship hundreds of light-years away. He tries to return, but only the ship itself, devoid of any occupant, is then discovered and rescued by humans two centuries later. The novelette was later expanded into the novel The Forever Man (1986), by the same author.",
+          "full": "A Canadian 40¢ postage stamp was issued in 1991 (as the Witched Canoe), illustrating this legend (Canadian Scott #1334 or #1445), which forms part of a series on Canadian folktales.\nOne of the oldest rides at Montreal's La Ronde amusement park, La Pitoune, uses this legend as inspiration. It is a basic sawmill log ride, but overhead is a representation of the flying canoe, with the devil perched behind the terrified men. The high bench at the back of the log-cars is therefore referred to as \"the devil-seat\". It closed down during the 2016 season.\nThe legend serves as the label motif for Maudite, an ale produced by the Unibroue brewery of Quebec.\nThe science fiction author Gordon R. Dickson wrote a novelette titled \"The Immortal\" in 1965, which was later incorporated into the collection Mutants (1970). A French-Canadian spaceman, piloting a spaceship called \"la Chasse Gallerie\" (the misspelling is consistent through the story), is the victim of an attack by aliens that misfires, sending his ship hundreds of light-years away. He tries to return, but only the ship itself, devoid of any occupant, is then discovered and rescued by humans two centuries later. The novelette was later expanded into the novel The Forever Man (1986), by the same author.",
+          "trimmed": false
+        }
+      ],
+      "suggestions": [
+        {
+          "id": "postbox",
+          "why": "Post box: a Canadian 40¢ stamp of the Witched Canoe was issued in 1991."
+        },
+        {
+          "id": "ferris",
+          "why": "Ferris wheel: La Ronde's log ride La Pitoune had a 'devil-seat' at the back."
+        },
+        {
+          "id": "barrel",
+          "why": "Barrel: Unibroue's Maudite ale uses the legend on its label."
+        },
+        {
+          "id": "rocket",
+          "why": "Rocket: Dickson's spaceship 'la Chasse Gallerie' is flung hundreds of light-years away."
+        },
+        {
+          "id": "robot",
+          "why": "Robot: aliens attack the French-Canadian spaceman in Dickson's novelette 'The Immortal'."
+        }
+      ],
+      "objectId": null
+    },
+    {
+      "id": "c5",
+      "heading": "In popular culture (continued)",
+      "parts": [
+        {
+          "heading": "In popular culture (continued)",
+          "section": "In popular culture",
+          "text": "The National Film Board of Canada produced a short animated film of The Legend of the Flying Canoe (La Chasse-galerie).\nClaude Dubois sings a song called \"Chasse Galerie\" on the live album Rencontre de rêves (1992). Bruno Pelletier performed it in 2001 at the opening of the fourth Jeux de la Francophonie.\nThe Quebec folk band La Bottine Souriante recorded a song based on the legend, \"Martin de la Chasse-Galerie\", for their album La Mistrine in 1994. In the song, Satan condemns the men in the flying canoe to wander in the skies over Montreal until the day of judgement.\nMontreal folk metal band Blackguard use an image of the flying canoe on the cover of their 2009 album Profugus Mortis. Included on the album is a song called \"The Last We Wage\". Its lyrics are based on this legend.\nDuring the Opening Ceremony for the 2010 Winter Olympics in Vancouver, a canoe containing fiddler Colin Maier was lowered from the ceiling in an allusion to the legend.\nThe Flying Canoe appears in Frédéric Back's 1981 animated film Crac.",
+          "full": "The National Film Board of Canada produced a short animated film of The Legend of the Flying Canoe (La Chasse-galerie).\nClaude Dubois sings a song called \"Chasse Galerie\" on the live album Rencontre de rêves (1992). Bruno Pelletier performed it in 2001 at the opening of the fourth Jeux de la Francophonie.\nThe Quebec folk band La Bottine Souriante recorded a song based on the legend, \"Martin de la Chasse-Galerie\", for their album La Mistrine in 1994. In the song, Satan condemns the men in the flying canoe to wander in the skies over Montreal until the day of judgement.\nMontreal folk metal band Blackguard use an image of the flying canoe on the cover of their 2009 album Profugus Mortis. Included on the album is a song called \"The Last We Wage\". Its lyrics are based on this legend.\nDuring the Opening Ceremony for the 2010 Winter Olympics in Vancouver, a canoe containing fiddler Colin Maier was lowered from the ceiling in an allusion to the legend.\nThe Flying Canoe appears in Frédéric Back's 1981 animated film Crac.",
+          "trimmed": false
+        }
+      ],
+      "suggestions": [
+        {
+          "id": "torch",
+          "why": "Olympic torch: at Vancouver 2010's opening, a canoe with a fiddler descended."
+        },
+        {
+          "id": "fiddle",
+          "why": "Fiddle: fiddler Colin Maier was lowered from the ceiling in a canoe."
+        },
+        {
+          "id": "microphone",
+          "why": "Microphone: Claude Dubois sings 'Chasse Galerie' on his 1992 live album."
+        },
+        {
+          "id": "guitar",
+          "why": "Guitar: folk metal band Blackguard put the flying canoe on their 2009 cover."
+        },
+        {
+          "id": "easel",
+          "why": "Easel: the Flying Canoe appears in Frédéric Back's 1981 animated film Crac."
+        }
+      ],
+      "objectId": null
+    },
+    {
+      "id": "c6",
+      "heading": "Adaptations",
+      "parts": [
+        {
+          "heading": "Adaptations",
+          "section": "Adaptations",
+          "text": "The Legend of the Flying Canoe: Directed by Robert Doucet, with Yvon Thiboutot is an animated French-Canadian folktale based on Chasse galerie released in 1996.\nThe radio program C'est la Vie retold the story on 28 December 2001, narrated by storyteller Marylyn Peringer.\nThe first feature film adaptation, Wild Run: The Legend (Chasse-Galerie: La Légende), was released in February 2016. It was written by Guillaume Vigneault and directed by Jean-Philippe Duval.\nA stage play written by Tyrone Savage, with music and lyrics by James Smith, was produced by the Soulpepper Theatre Company in Toronto in 2016.",
+          "full": "The Legend of the Flying Canoe: Directed by Robert Doucet, with Yvon Thiboutot is an animated French-Canadian folktale based on Chasse galerie released in 1996.\nThe radio program C'est la Vie retold the story on 28 December 2001, narrated by storyteller Marylyn Peringer.\nThe first feature film adaptation, Wild Run: The Legend (Chasse-Galerie: La Légende), was released in February 2016. It was written by Guillaume Vigneault and directed by Jean-Philippe Duval.\nA stage play written by Tyrone Savage, with music and lyrics by James Smith, was produced by the Soulpepper Theatre Company in Toronto in 2016.",
+          "trimmed": false
+        }
+      ],
+      "suggestions": [
+        {
+          "id": "filmcamera",
+          "why": "Film camera: Wild Run: The Legend, the first feature film, released 2016."
+        },
+        {
+          "id": "radio",
+          "why": "Vintage radio: C'est la Vie retold the story on 28 December 2001."
+        },
+        {
+          "id": "campfire",
+          "why": "Campfire: storyteller Marylyn Peringer narrated the radio retelling."
+        },
+        {
+          "id": "masks",
+          "why": "Theatre masks: Tyrone Savage's stage play was produced by Soulpepper in 2016."
+        },
+        {
+          "id": "tv",
+          "why": "Television: Robert Doucet directed the 1996 animated Legend of the Flying Canoe."
+        }
+      ],
+      "objectId": null
+    }
+  ],
+  "recallSessions": []
+}

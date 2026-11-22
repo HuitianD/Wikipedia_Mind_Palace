@@ -1,0 +1,62 @@
+[
+  {
+    "title": "Black hole",
+    "file": "data/palaces/black-hole.json",
+    "theme": "observatory",
+    "stops": 8
+  },
+  {
+    "title": "Chasse-galerie",
+    "file": "data/palaces/chasse-galerie.json",
+    "theme": "library",
+    "stops": 7
+  },
+  {
+    "title": "Great Wall of China",
+    "file": "data/palaces/great-wall-of-china.json",
+    "theme": "museum",
+    "stops": 7
+  },
+  {
+    "title": "Honey bee",
+    "file": "data/palaces/honey-bee.json",
+    "theme": "museum",
+    "stops": 8
+  },
+  {
+    "title": "Jazz",
+    "file": "data/palaces/jazz.json",
+    "theme": "museum",
+    "stops": 7
+  },
+  {
+    "title": "Leonardo da Vinci",
+    "file": "data/palaces/leonardo-da-vinci.json",
+    "theme": "museum",
+    "stops": 8
+  },
+  {
+    "title": "Photosynthesis",
+    "file": "data/palaces/photosynthesis.json",
+    "theme": "observatory",
+    "stops": 8
+  },
+  {
+    "title": "Roman Empire",
+    "file": "data/palaces/roman-empire.json",
+    "theme": "museum",
+    "stops": 8
+  },
+  {
+    "title": "Solar System",
+    "file": "data/palaces/solar-system.json",
+    "theme": "observatory",
+    "stops": 8
+  },
+  {
+    "title": "Volcano",
+    "file": "data/palaces/volcano.json",
+    "theme": "museum",
+    "stops": 8
+  }
+]
