@@ -252,7 +252,6 @@ function showSetup() {
   showOverlay(`
     <nav class="modes" aria-label="Mode">
       <a href="${esc(location.pathname)}" title="Try the ready-made palaces">Demo</a>
-      <a href="${esc(location.pathname)}?explore" title="Build a palace for any Wikipedia article">Explore</a>
       <a class="on" href="${esc(location.pathname)}?study" aria-current="page">Study session</a>
     </nav>
     <div class="eyebrow">Researcher setup</div>

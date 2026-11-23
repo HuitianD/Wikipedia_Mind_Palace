@@ -4,7 +4,6 @@ import { THEMES, pickTheme, suggestObjects, explain } from './mapper.js';
 import { OBJECTS, OBJECT_BY_ID } from './catalog.js';
 import { study, bootStudy, log as studyLog, saveStudy, finishEarly } from './study.js';
 import { findAnchors } from './anchors.js';
-import { access, loadAccess, needsSignIn, canExplore, sessionExpired, setRemaining } from './access.js';
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -12,9 +11,10 @@ const paras = (t) => t.split(/\n+/).filter(Boolean).map((p) => `<p>${esc(p)}</p>
 const STORE_KEY = 'wmp.palace.v1';
 
 // The three modes of the site, chosen by the address:
-//   demo    (/)          the ready-made palaces only. Open to everyone, no sign-in, no Claude.
-//   explore (/?explore)  a palace for any Wikipedia article, with Claude. Needs the Google
-//                        sign-in (js/access.js). /?article=… also lands here.
+//   demo    (/)          the ready-made palaces only. No Claude, so it can be public.
+//   explore (/?explore)  a palace for any Wikipedia article, with Claude. Only where the app
+//                        runs on your own computer; the deployed site does not offer it
+//                        (api/suggest.js). /?article=… also lands here.
 //   study   (/?study)    the timed user-study session, with its own sign-in (js/study.js).
 const params = new URLSearchParams(location.search);
 const MODE = params.has('study') ? 'study' : params.has('explore') || params.has('article') ? 'explore' : 'demo';
@@ -191,19 +191,28 @@ function showLanding() {
   if (!$('#search-form').hidden) $('#q').focus();
 }
 
-/** Show the parts of the start page that belong to this mode (and, in Explore, to this visitor). */
+/** Show the parts of the start page that belong to this mode, and to what this server offers. */
 function renderLandingMode() {
-  const explore = MODE === 'explore';
+  const explore = MODE === 'explore' && site.known && site.explore;
+  $('#mode-explore').hidden = !(site.known && site.explore); // no Explore tab on the deployed site
   for (const [id, on] of [['#mode-demo', !explore], ['#mode-explore', explore]]) {
     $(id).classList.toggle('on', on);
     if (on) $(id).setAttribute('aria-current', 'page'); else $(id).removeAttribute('aria-current');
   }
+  const note = $('#explore-note');
+  note.hidden = true;
+  if (MODE === 'explore' && site.known && !site.explore) {
+    note.textContent = 'Building a palace for a new article is only available when the app runs on your own computer. Here you can try the ready-made palaces.';
+    note.hidden = false;
+  } else if (explore && !site.claude) {
+    note.textContent = 'No Claude API key on this server: the setting and objects are matched by keywords.';
+    note.hidden = false;
+  }
   $('#landing-lead').textContent = explore
     ? 'Turn any Wikipedia article into a room. Claude suggests the setting and an object for each section; you choose, and retrace the path later to remember it.'
     : 'Turn a Wikipedia article into a room. Each section becomes an object you choose, placed along a path. Retrace the path later to remember it. Pick an article below to try it.';
-  $('#search-form').hidden = !(explore && canExplore());
+  $('#search-form').hidden = !explore;
   $('#open-file').hidden = !explore;
-  if (!explore) $('#access').hidden = true;
   $('#ready-title').textContent = explore ? 'Or a ready-made palace' : 'Ready-made palaces';
   document.querySelector('.alt').hidden = $('#resume').hidden && $('#open-file').hidden;
 }
@@ -227,25 +236,13 @@ async function requestClaude(title, chunks) {
     body: JSON.stringify({
       title,
       chunks: chunks.map((c) => ({ heading: c.heading, text: c.parts.map((p) => `${p.heading}\n${p.full}`).join('\n\n') })),
-      token: access.token || undefined, // the sign-in session, where the site asks for one (js/access.js)
     }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
-    if (body?.code === 'signin') sessionExpired();
-    const message = body?.error || (res.status === 404 || res.status === 501 ? 'no AI server running' : `server returned ${res.status}`);
-    throw Object.assign(new Error(message), { code: body?.code });
+    throw new Error(body?.error || (res.status === 404 || res.status === 501 ? 'no AI server running' : `server returned ${res.status}`));
   }
-  const out = await res.json();
-  setRemaining(out.remaining);
-  return out;
-}
-
-/** Why Claude was not used, as a short message for the reader. */
-function fallbackNotice(err) {
-  if (err.code === 'signin') return 'Your sign-in has expired, so the objects are matched by keywords. Sign in again on the Explore page for Claude\'s suggestions.';
-  if (err.code === 'limit') return `${err.message} Using keyword suggestions instead.`;
-  return `Claude suggestions unavailable (${err.message.replace(/\.$/, '')}). Using keyword suggestions instead.`;
+  return res.json();
 }
 
 function keywordSuggestions(chunks) {
@@ -257,9 +254,15 @@ function keywordSuggestions(chunks) {
   });
 }
 
-// Whether Claude needs a sign-in on this site. Only asked in Explore mode: the Demo and
-// the study never use Claude, so their pages never contact the sign-in provider.
-let accessReady = Promise.resolve();
+// What this server offers (GET api/suggest): Explore mode at all, and Claude for it.
+// The deployed site answers explore: false. A plain file server has no such endpoint;
+// Explore then works with keyword suggestions, which cost nothing.
+const site = { known: false, explore: true, claude: false };
+const siteReady = MODE === 'study' ? Promise.resolve() : fetch('api/suggest')
+  .then((r) => (r.ok ? r.json() : null))
+  .then((j) => { if (j) Object.assign(site, { explore: !!j.explore, claude: !!j.claude }); })
+  .catch(() => {})
+  .then(() => { site.known = true; if (view.mode === 'landing') renderLandingMode(); });
 
 // ---- ready-made palaces ---------------------------------------------------------------
 // Articles listed in data/palaces/index.json were built ahead of time
@@ -301,15 +304,14 @@ async function buildFromArticle(getArticle) {
     const chunks = chunkArticle(article.extract);
     if (!chunks.length) throw new Error('That article has no readable sections.');
 
-    await accessReady;
-    const askClaude = !needsSignIn();
-    setLoading(askClaude ? 'Asking Claude to pick a theme and objects…' : 'Matching objects to each section…');
+    await siteReady;
+    setLoading(site.claude ? 'Asking Claude to pick a theme and objects…' : 'Matching objects to each section…');
     let theme;
     let themeReason = null;
     let perChunk;
     let suggestedBy;
     try {
-      if (!askClaude) throw Object.assign(new Error('not signed in'), { code: 'signin' });
+      if (!site.claude) throw new Error('no Claude API key on this server');
       const ai = await requestClaude(article.title, chunks);
       theme = ai.theme;
       themeReason = ai.themeReason;
@@ -319,7 +321,7 @@ async function buildFromArticle(getArticle) {
       theme = pickTheme(chunks);
       perChunk = keywordSuggestions(chunks);
       suggestedBy = { source: 'keywords', at: new Date().toISOString(), note: err.message };
-      toast(fallbackNotice(err), 8000);
+      toast(`Claude suggestions unavailable (${err.message.replace(/\.$/, '')}). Using keyword suggestions instead.`);
     }
 
     loadPalace({
@@ -348,12 +350,9 @@ const startFromTitle = async (input) => {
   const ready = await findReady(title);
   if (ready && await openReady(ready)) return;
   if (MODE !== 'explore') return showError('That palace could not be opened. Please try another one.');
-  // anything that is not ready-made is built with Claude, which needs the Explore sign-in
-  await accessReady;
-  if (!canExplore()) {
-    $('#q').value = title;
-    return showError(needsSignIn() ? `Sign in above to build a palace for “${title}”.` : 'Explore is not open on this site yet.');
-  }
+  // anything that is not ready-made is built live, which the deployed site does not offer
+  await siteReady;
+  if (!site.explore) return showError(`“${title}” is not one of the ready-made palaces.`);
   buildFromArticle(() => fetchArticle(title));
 };
 const startSample = () => startFromTitle('Honey bee');
@@ -866,8 +865,6 @@ if (MODE === 'study') {
     lockPalace: () => { hideCandidates(); closePanel(); setHint(''); $('#topbar').hidden = true; room.mode = 'landing'; },
   }, params.get('study'));
 } else {
-  // only Explore talks to the sign-in server; the Demo needs nothing
-  if (MODE === 'explore') accessReady = loadAccess($('#access'), () => { if (view.mode === 'landing') renderLandingMode(); });
   showLanding();
   if (params.get('article')) {
     $('#q').value = params.get('article');

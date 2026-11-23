@@ -14,26 +14,25 @@ npm run dev            # http://localhost:8000
 ```
 
 To turn on Claude suggestions, copy `.env.example` to `.env` and set `ANTHROPIC_API_KEY`. Without a key
-everything still works: the app shows a notice and falls back to the offline keyword matcher. On a
-public site, Claude is limited to people who sign in with a Brown account (see "Who can use Claude"). three.js
-loads from jsDelivr, so the browser needs internet access.
+everything still works: the app shows a notice and falls back to the offline keyword matcher. Claude is
+only used when the app runs on your own computer; the deployed site never calls it (see "Where Claude
+runs"). three.js loads from jsDelivr, so the browser needs internet access.
 
 The app has three modes, switched at the top of the landing page:
 
 - **Demo** (`/`): the nine ready-made palaces (see below). Open to everyone: no sign-in, no Claude, no
   cost.
 - **Explore** (`/?explore`): the full app. Any Wikipedia article, with Claude suggesting the setting and
-  objects. Needs a Google sign-in with a Brown account (see "Who can use Claude"); until someone signs in,
-  the page shows the sign-in button instead of the search box.
-- **Study session** (`/?study`): the timed version for the user study. Its own sign-in (name, email, age;
-  no Google account), a fixed article, a countdown and the memory quiz. With a MongoDB database,
+  objects. Only on your own computer (`npm run dev`); the deployed site has no Explore tab.
+- **Study session** (`/?study`): the timed version for the user study. Sign-in with name, email and age,
+  a fixed article, a countdown and the memory quiz. With a MongoDB database,
   participants can do this on their own computers and the data is collected in one place.
 
 | URL | What it opens |
 |---|---|
 | `/` | Demo mode: the ready-made palaces |
-| `/?explore` | Explore mode: sign in, then search any article |
-| `/?article=Roman%20Empire` | Explore mode, building a palace for that article right away (after sign-in) |
+| `/?explore` | Explore mode (local only): search any article |
+| `/?article=Roman%20Empire` | open that article: the ready-made palace if there is one, otherwise built live (local only) |
 | `/?sample` | the ready-made Honey bee palace |
 | `/?study` | **Study session mode** (see below): what participants open |
 | `/?study=admin` | the research team's page: everyone who signed in, downloads |
@@ -193,41 +192,24 @@ files as personal data: keep them out of the repo and share them only within the
 The familiarity rating and the follow-up questions stay outside the app (e.g. a form). Don't change the
 questions in `lib/study-quiz.js` once the study has started.
 
-## Who can use Claude (sign-in)
+## Where Claude runs
 
-Asking Claude about a new article spends API credit, so on a public site it sits behind a sign-in.
-The ready-made palaces, the keyword suggestions and the study are free and need no sign-in.
+Asking Claude about a new article spends API credit, and the site has no sign-in for it. So Claude is
+only used where you run the app yourself:
 
-- Set `GOOGLE_CLIENT_ID` and the Explore page shows a "Sign in with Google" button. Only accounts in
-  `ALLOWED_EMAIL_DOMAINS` (default `brown.edu`) get Claude's suggestions; the server checks Google's
-  signed token, including the account's Workspace domain, so typing a Brown address is not enough.
-  `ALLOWED_EMAILS` adds single addresses outside the domain (a teammate's Gmail, say).
-- Everyone signed in gets `SUGGEST_DAILY_LIMIT` Claude requests a day (default 10; one request = one
-  article). With `MONGODB_URI` set, the count is kept in the `usage` collection (email, day, count;
-  rows delete themselves after 30 days). Without a database it is counted in memory, which Vercel does
-  not keep between server instances, so set `MONGODB_URI` for a limit that holds.
-- Someone not signed in sees the sign-in button in place of the search box. Someone over the limit, or
-  hit by a Claude error, still gets the palace: the objects are then matched by keywords, and a notice
-  says so.
-- Without `GOOGLE_CLIENT_ID`, Claude is open to everyone on your own computer (`npm run dev`) and the
-  Explore page says so; put a client ID in `.env` to see the sign-in button locally. On Vercel, Explore is
-  **switched off** without it, so a deployment cannot expose the key by accident.
+- **On your own computer** (`npm run dev` with `ANTHROPIC_API_KEY` in `.env`): Explore mode asks Claude
+  for the setting and objects of any article. Without a key it matches them by keywords instead.
+- **On the deployed site**: Claude is switched off, whether or not a key is set there. `api/suggest.js`
+  refuses every request when it runs on Vercel, the Explore tab is hidden, and `/?explore` shows the Demo.
+  The Demo and the study only use palaces that were built ahead of time, so nothing is missing.
 
-To get a client ID: Google Cloud console > APIs & Services > Credentials > Create credentials > OAuth
-client ID > Web application. Under "Authorized JavaScript origins" add the site's address
-(`https://<project>.vercel.app`) and, for local testing, `http://localhost:8000` and `http://localhost`.
-No client secret is used. The code is in `lib/access.js`, `api/auth.js` and `js/access.js`.
-
-As a last line of defence, set a monthly spend limit for the API key in the Claude Console.
+To add a ready-made article, build it locally with `npm run build-palace` and push the new file.
 
 ## Deploy (Vercel)
 
-The repo deploys as-is: static files plus the `api/suggest.js`, `api/auth.js` and `api/study.js`
-functions. Set these in the Vercel project's environment variables:
-
-- for the study: `MONGODB_URI` and `STUDY_ADMIN_KEY`
-- for Claude in Explore mode: `ANTHROPIC_API_KEY` **and** `GOOGLE_CLIENT_ID` (see above). With only the
-  API key, Claude stays off on Vercel.
+The repo deploys as-is: static files plus the `api/suggest.js` and `api/study.js` functions. For the
+study, set `MONGODB_URI` and `STUDY_ADMIN_KEY` in the Vercel project's environment variables. Do not add
+`ANTHROPIC_API_KEY` there: the deployed site never uses it.
 
 `vercel.json` makes sure the study function can read `data/`, and redirects requests for `lib/` and
 `scripts/` so the quiz questions cannot be opened as a file. After deploying, check that
